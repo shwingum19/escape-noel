@@ -453,10 +453,12 @@ const state = {
 };
 
 const fbState = {
-  db:        null,     // Firebase Database ref (null = non configuré)
+  db:        null,
   connected: false,
-  rooms:     {},       // { roomId: { lockedBy, lockedAt, lockedByName } | null }
-  mission:   null,     // { roomId, tool, roomDisplayName }
+  rooms:     {},
+  mission:   null,
+  progress:  {},   // { toolKey: true, done_xxx: true, radio_clue: true, ... }
+  carnet:    [],   // entrées du carnet (array)
 };
 let _fbFirstUpdate = true;
 
@@ -982,22 +984,28 @@ let _scanElements = [];
 /* Icône cadenas SVG pixel art (overlay sur les boutons verrouillés) */
 const PADLOCK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><rect x="4" y="7" width="8" height="7" fill="#2C1808"/><rect x="5" y="8" width="6" height="5" fill="#8B6914"/><rect x="6" y="4" width="1" height="4" fill="#2C1808"/><rect x="9" y="4" width="1" height="4" fill="#2C1808"/><rect x="6" y="3" width="4" height="2" fill="#2C1808"/><rect x="6" y="10" width="4" height="3" fill="#5A3A28"/><rect x="7" y="9" width="2" height="2" fill="#5A3A28"/></svg>';
 
-/* ── Helpers localStorage outils ── */
+/* ── Helpers Firebase état ── */
 function isToolUnlocked(key) {
   if (!key) return true;
-  try { return localStorage.getItem('esc_noel_unlock_' + key + '_' + state.teamId) === '1'; }
-  catch (_) { return false; }
+  if (state.testMode) return true;
+  return fbState.progress[key] === true;
 }
 
 function unlockTool(key) {
   if (state.testMode) return;
-  try { localStorage.setItem('esc_noel_unlock_' + key + '_' + state.teamId, '1'); }
-  catch (_) {}
-  if (fbState.db && key !== 'carnet') {
-    try { fbState.db.ref('progress/' + state.teamId + '/' + key).set(true); } catch (_) {}
-  }
+  _fbWriteProgress(key);
   if (fbState.mission?.tool === key) _endMission(true);
   if (key === 'carnet' && fbState.mission) _endMission(true);
+}
+
+function _fbWriteProgress(key, val) {
+  if (!fbState.db || !state.teamId) return;
+  try { fbState.db.ref('progress/' + state.teamId + '/' + key).set(val !== undefined ? val : true); } catch (_) {}
+}
+
+function _fbWriteCarnet(type, entry) {
+  if (!fbState.db || !state.teamId) return;
+  try { fbState.db.ref('carnet/' + state.teamId + '/' + type).set(entry); } catch (_) {}
 }
 
 function buildMenu(withConfetti) {
@@ -1516,6 +1524,11 @@ function init() {
   const tag = params.get('tag');
   if (tag) {
     initSnow();
+    /* Récupérer l'équipe pour que Firebase sache où écrire */
+    try {
+      const savedTeam = parseInt(localStorage.getItem('esc_noel_team'), 10);
+      if (CONFIG.teams[savedTeam]) state.teamId = savedTeam;
+    } catch (_) {}
     initFirebase();
     handleTagScan(tag);
     return;
@@ -1611,13 +1624,11 @@ function openRadio() {
   updateRadioFreqDisplay(radioState.freq);
   drawDial(radioState.dialAngle);
 
-  /* Restaurer l'état depuis localStorage */
-  try {
-    if (localStorage.getItem('esc_noel_radio_clue_' + state.teamId) === '1') {
-      radioState.clueFound = true;
-      $('btnRadioReplay').classList.remove('hidden');
-    }
-  } catch (_) {}
+  /* Restaurer l'état depuis Firebase */
+  if (fbState.progress['radio_clue'] === true) {
+    radioState.clueFound = true;
+    $('btnRadioReplay').classList.remove('hidden');
+  }
 
   /* Démarrer l'audio après interaction utilisateur */
   setTimeout(() => initRadioAudio(), 100);
@@ -1980,14 +1991,9 @@ async function triggerRealStation(station) {
 
   /* Enregistrer l'indice */
   if (!state.testMode) {
-    try {
-      localStorage.setItem('esc_noel_radio_clue_' + state.teamId, '1');
-      unlockTool('carnet');
-      /* Sauvegarder l'entrée du carnet */
-      const entries = JSON.parse(localStorage.getItem('esc_noel_carnet_' + state.teamId) || '[]');
-      entries.push({ type: 'radio', title: station.clue.title, text: station.clue.text, freq: station.freq });
-      localStorage.setItem('esc_noel_carnet_' + state.teamId, JSON.stringify(entries));
-    } catch (_) {}
+    _fbWriteProgress('radio_clue');
+    unlockTool('carnet');
+    _fbWriteCarnet('radio', { type: 'radio', title: station.clue.title, text: station.clue.text, freq: station.freq });
   }
 
   /* Afficher les sous-titres */
@@ -2038,11 +2044,9 @@ function openPuzzle(puzzleId) {
   puzzleState.currentPuzzle = puzzleId;
   puzzleState.solved = false;
 
-  try {
-    if (!state.testMode && localStorage.getItem('esc_noel_puzzle_' + puzzleId + '_' + state.teamId) === '1') {
-      puzzleState.solved = true;
-    }
-  } catch (_) {}
+  if (!state.testMode && fbState.progress['done_puzzle_' + puzzleId] === true) {
+    puzzleState.solved = true;
+  }
 
   $('puzzleTitle').textContent = pz.title;
   $('puzzleText').textContent  = pz.enigma.text;
@@ -2124,20 +2128,16 @@ function checkPuzzleAnswer() {
     clearTimeout(puzzleState.hintTimer);
 
     if (!state.testMode) {
-      try {
-        localStorage.setItem('esc_noel_puzzle_' + puzzleState.currentPuzzle + '_' + state.teamId, '1');
-        unlockTool('carnet');
-        const entries = JSON.parse(localStorage.getItem('esc_noel_carnet_' + state.teamId) || '[]');
-        entries.push({
-          type:     'puzzle',
-          puzzleId: puzzleState.currentPuzzle,
-          icon:     pz.carnetEntry.icon || '📖',
-          title:    pz.carnetEntry.title,
-          text:     pz.carnetEntry.text,
-          answer:   raw,
-        });
-        localStorage.setItem('esc_noel_carnet_' + state.teamId, JSON.stringify(entries));
-      } catch (_) {}
+      _fbWriteProgress('done_puzzle_' + puzzleState.currentPuzzle);
+      unlockTool('carnet');
+      _fbWriteCarnet('puzzle_' + puzzleState.currentPuzzle, {
+        type:     'puzzle',
+        puzzleId: puzzleState.currentPuzzle,
+        icon:     pz.carnetEntry.icon || '📖',
+        title:    pz.carnetEntry.title,
+        text:     pz.carnetEntry.text,
+        answer:   raw,
+      });
     }
 
     _triggerPuzzleSuccess(pz, raw);
@@ -2167,8 +2167,7 @@ function _showPuzzleSolvedState(pz) {
   $('puzzleSuccessMsg').textContent  = pz.enigma.successMessage || 'Réussi !';
   $('puzzleCarnetNotif').textContent = '✅ Indice enregistré dans le Carnet !';
   try {
-    const entries = JSON.parse(localStorage.getItem('esc_noel_carnet_' + state.teamId) || '[]');
-    const entry   = [...entries].reverse().find(e => e.puzzleId === puzzleState.currentPuzzle);
+    const entry = [...(fbState.carnet || [])].reverse().find(e => e.puzzleId === puzzleState.currentPuzzle);
     $('puzzleAnswerDisplay').textContent = entry?.answer ? '→ ' + entry.answer : '';
   } catch (_) { $('puzzleAnswerDisplay').textContent = ''; }
 }
@@ -2212,6 +2211,19 @@ function initFirebase() {
     fbState.db.ref('rooms').on('value', snap => {
       _onRoomsUpdate(snap.val() || {});
     });
+
+    /* Écoute de la progression et du carnet de l'équipe */
+    if (state.teamId) {
+      fbState.db.ref('progress/' + state.teamId).on('value', snap => {
+        fbState.progress = snap.val() || {};
+        if ($('menuGrid')) buildMenu(false);
+      });
+      fbState.db.ref('carnet/' + state.teamId).on('value', snap => {
+        const data = snap.val() || {};
+        fbState.carnet = Object.values(data);
+        if ($('carnetEntries')) renderCarnet();
+      });
+    }
 
     /* Vérification timeout toutes les minutes */
     setInterval(_checkLockTimeouts, 60000);
@@ -2456,7 +2468,7 @@ function openRecettes() {
   $('puzzleImg').classList.add('hidden');
 
   const teamId = state.teamId;
-  const allSolved = !state.testMode && localStorage.getItem('esc_noel_puzzle_recettes_' + teamId) === '1';
+  const allSolved = !state.testMode && fbState.progress['done_puzzle_recettes'] === true;
 
   try {
     const savedOrder = JSON.parse(localStorage.getItem('esc_noel_recettes_order_' + teamId) || 'null');
@@ -2597,13 +2609,9 @@ function _animRecettesPageTurn(callback) {
 function _triggerRecettesComplete() {
   const pz = CONFIG.puzzles.recettes;
   if (!state.testMode) {
-    try {
-      localStorage.setItem('esc_noel_puzzle_recettes_' + state.teamId, '1');
-      unlockTool('carnet');
-      const entries = JSON.parse(localStorage.getItem('esc_noel_carnet_' + state.teamId) || '[]');
-      entries.push({ type: 'puzzle', puzzleId: 'recettes', icon: pz.carnetEntry.icon, title: pz.carnetEntry.title, text: pz.carnetEntry.text });
-      localStorage.setItem('esc_noel_carnet_' + state.teamId, JSON.stringify(entries));
-    } catch (_) {}
+    _fbWriteProgress('done_puzzle_recettes');
+    unlockTool('carnet');
+    _fbWriteCarnet('puzzle_recettes', { type: 'puzzle', puzzleId: 'recettes', icon: pz.carnetEntry.icon, title: pz.carnetEntry.title, text: pz.carnetEntry.text });
   }
   playVictory();
   showPuzzleSparkles();
@@ -2688,11 +2696,9 @@ const carillonState = {
 
 function openCarillon() {
   showScreen('screen-carillon');
-  try {
-    if (localStorage.getItem('esc_noel_carillon_solved_' + state.teamId) === '1') {
-      carillonState.solved = true;
-    }
-  } catch (_) {}
+  if (fbState.progress['done_carillon'] === true) {
+    carillonState.solved = true;
+  }
   if (!carillonState.initialized) {
     carillonState.initialized = true;
     _buildCarillon();
@@ -2827,22 +2833,10 @@ function _triggerCarillonSuccess() {
   carillonState.solved = true;
 
   if (!state.testMode) {
-    try {
-      localStorage.setItem('esc_noel_carillon_solved_' + state.teamId, '1');
-      unlockTool('carnet');
-      const cfg     = CONFIG.carillon;
-      const key     = 'esc_noel_carnet_' + state.teamId;
-      const entries = JSON.parse(localStorage.getItem(key) || '[]');
-      if (!entries.some(e => e.type === 'carillon')) {
-        entries.push({
-          type:  'carillon',
-          icon:  cfg.carnetEntry.icon,
-          title: cfg.carnetEntry.title,
-          text:  cfg.carnetEntry.text,
-        });
-        localStorage.setItem(key, JSON.stringify(entries));
-      }
-    } catch (_) {}
+    _fbWriteProgress('done_carillon');
+    unlockTool('carnet');
+    const cfg = CONFIG.carillon;
+    _fbWriteCarnet('carillon', { type: 'carillon', icon: cfg.carnetEntry.icon, title: cfg.carnetEntry.title, text: cfg.carnetEntry.text });
   }
 
   buildMenu(false);
@@ -2957,9 +2951,8 @@ function handleNuitTag(starNum) {
     return;
   }
 
-  const solvedKey   = 'esc_noel_bougie_solved_'   + teamId;
   const progressKey = 'esc_noel_bougie_progress_' + teamId;
-  if (localStorage.getItem(solvedKey) === '1') {
+  if (fbState.progress['done_bougie'] === true) {
     showScreen('screen-menu');
     buildMenu(false);
     setTimeout(openBougie, 80);
@@ -2975,7 +2968,7 @@ function handleNuitTag(starNum) {
     progress.push(starNum);
     localStorage.setItem(progressKey, JSON.stringify(progress));
     if (progress.length === seq.length) {
-      localStorage.setItem(solvedKey, '1');
+      _fbWriteProgress('done_bougie');
       _triggerBougieSolved(teamId);
     }
     _bougieLastScanWrong = false;
@@ -2991,7 +2984,7 @@ function handleNuitTag(starNum) {
 function openBougie(skipPrep) {
   showScreen('screen-bougie');
   _initBougie();
-  if (skipPrep || localStorage.getItem('esc_noel_bougie_solved_' + state.teamId) === '1') {
+  if (skipPrep || fbState.progress['done_bougie'] === true) {
     _showBougiePuzzle();
   } else {
     _showBougiePrep();
@@ -3160,7 +3153,7 @@ function _renderConstellationState() {
   const cfg        = CONFIG.bougie;
   const seq        = cfg.sequence;
 
-  const isSolved = localStorage.getItem(solvedKey) === '1';
+  const isSolved = fbState.progress['done_bougie'] === true;
   let progress   = [];
   try { progress = JSON.parse(localStorage.getItem(progressKey) || '[]'); } catch (_) {}
 
@@ -3217,14 +3210,7 @@ function _triggerBougieSolved(teamId) {
   const cfg   = CONFIG.bougie;
   const entry = cfg.carnetEntry;
   unlockTool('carnet');
-  try {
-    const key    = 'esc_noel_carnet_' + teamId;
-    const carnet = JSON.parse(localStorage.getItem(key) || '[]');
-    if (!carnet.some(e => e.title === entry.title)) {
-      carnet.push({ type: 'bougie', icon: entry.icon, title: entry.title, text: entry.text });
-      localStorage.setItem(key, JSON.stringify(carnet));
-    }
-  } catch (_) {}
+  _fbWriteCarnet('bougie', { type: 'bougie', icon: entry.icon, title: entry.title, text: entry.text });
 }
 
 function _showBougieSuccess() {
@@ -3414,7 +3400,7 @@ function _initForet() {
 
 function _renderForetState() {
   const teamId = state.teamId;
-  const solved  = localStorage.getItem('esc_noel_foret_solved_' + teamId) === '1';
+  const solved  = fbState.progress['done_foret'] === true;
   const consigneEl = $('foret-consigne');
   if (consigneEl) consigneEl.textContent = CONFIG.foret.texts.consigne;
 
@@ -3462,15 +3448,9 @@ function _checkForetAnswer() {
   if (isNaN(num) || raw === '') return;
 
   if (num === cfg.answer) {
-    try {
-      localStorage.setItem('esc_noel_foret_solved_' + state.teamId, '1');
-      unlockTool('carnet');
-      const entries = JSON.parse(localStorage.getItem('esc_noel_carnet_' + state.teamId) || '[]');
-      if (!entries.some(e => e.type === 'foret')) {
-        entries.push({ type: 'foret', icon: cfg.carnetEntry.icon, title: cfg.carnetEntry.title, text: cfg.carnetEntry.text, answer: String(num) });
-        localStorage.setItem('esc_noel_carnet_' + state.teamId, JSON.stringify(entries));
-      }
-    } catch (_) {}
+    _fbWriteProgress('done_foret');
+    unlockTool('carnet');
+    _fbWriteCarnet('foret', { type: 'foret', icon: cfg.carnetEntry.icon, title: cfg.carnetEntry.title, text: cfg.carnetEntry.text, answer: String(num) });
     $('foret-input-area').classList.add('hidden');
     $('foret-error-msg').classList.add('hidden');
     $('foret-cooldown').classList.add('hidden');
@@ -3765,7 +3745,7 @@ function _renderTradState() {
   });
   _updateTradDisplay(map);
 
-  if (localStorage.getItem('esc_noel_traducteur_solved_' + teamId)) {
+  if (fbState.progress['done_traducteur'] === true) {
     _showTradSolvedState();
   }
 }
@@ -3872,14 +3852,14 @@ function _saveTradMap(map) {
 
 function _checkTradAnswer() {
   const teamId = state.teamId;
-  if (localStorage.getItem('esc_noel_traducteur_solved_' + teamId)) return;
+  if (fbState.progress['done_traducteur'] === true) return;
 
   const cfg = CONFIG.traducteur;
   const raw = $('tradAnswerInput').value;
   if (!raw.trim()) return;
 
   if (normAnswer(raw) === normAnswer(cfg.answer)) {
-    localStorage.setItem('esc_noel_traducteur_solved_' + teamId, '1');
+    _fbWriteProgress('done_traducteur');
     _triggerTradSuccess();
   } else {
     _triggerTradError();
@@ -3905,15 +3885,8 @@ function _triggerTradSuccess() {
   $('trad-test-btn').classList.add('hidden');
 
   if (!state.testMode) {
-    try {
-      unlockTool('carnet');
-      const _key     = 'esc_noel_carnet_' + state.teamId;
-      const _entries = JSON.parse(localStorage.getItem(_key) || '[]');
-      if (!_entries.some(e => e.type === 'traducteur')) {
-        _entries.push({ type: 'traducteur', icon: cfg.carnetEntry.icon, title: cfg.carnetEntry.title, text: cfg.carnetEntry.text });
-        localStorage.setItem(_key, JSON.stringify(_entries));
-      }
-    } catch (_) {}
+    unlockTool('carnet');
+    _fbWriteCarnet('traducteur', { type: 'traducteur', icon: cfg.carnetEntry.icon, title: cfg.carnetEntry.title, text: cfg.carnetEntry.text });
   }
 }
 
@@ -3955,7 +3928,7 @@ function _startTradHintTimer() {
   _stopTradTimers();
   tradState.hintInterval = setInterval(() => {
     const teamId = state.teamId;
-    if (localStorage.getItem('esc_noel_traducteur_solved_' + teamId)) {
+    if (fbState.progress['done_traducteur'] === true) {
       _stopTradTimers(); return;
     }
     const cfg = CONFIG.traducteur;
@@ -4076,10 +4049,7 @@ function renderCarnet() {
   const empty   = $('carnetEmpty');
   if (!list || !empty) return;
 
-  let entries = [];
-  try {
-    entries = JSON.parse(localStorage.getItem('esc_noel_carnet_' + state.teamId) || '[]');
-  } catch (_) {}
+  let entries = fbState.carnet || [];
 
   /* En mode test, afficher une entrée factice */
   if (state.testMode && entries.length === 0) {
