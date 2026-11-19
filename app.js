@@ -926,6 +926,7 @@ function startGame() {
   state.currentStep = 0;
   state.litLeds.clear();
   try { localStorage.setItem('esc_noel_team', String(state.teamId)); } catch (_) {}
+  _fbWriteProgress('guirlande_done');
 
   buildLeds();
   updateProgress(0, state.teamCfg.order.length);
@@ -1372,16 +1373,10 @@ function handleTagScan(tag) {
     return;
   }
 
-  /* Vérifier que le badge a été validé */
-  try {
-    if (localStorage.getItem('esc_noel_success_' + teamId) !== '1') {
-      showScreen('screen-tag-error');
-      $('tagErrorMsg').textContent = 'Badge non validé !\nTerminez d\'abord l\'épreuve de la guirlande.';
-      return;
-    }
-  } catch (_) {
+  /* Vérifier que la guirlande a été validée (clé Firebase) */
+  if (fbState.progress['guirlande_done'] !== true) {
     showScreen('screen-tag-error');
-    $('tagErrorMsg').textContent = 'Erreur d\'accès aux données.';
+    $('tagErrorMsg').textContent = 'Badge non validé !\nTerminez d\'abord l\'épreuve de la guirlande.';
     return;
   }
 
