@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#131020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Terminal des Elfes</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=11">
+</head>
+<body>
+
+  <!-- Fond : flocons + étincelles + sapin en pixel art -->
+  <canvas id="snowCanvas" aria-hidden="true"></canvas>
+
+  <!-- Bouton son (global) -->
+  <button id="soundBtn" class="sound-btn" aria-label="Basculer le son">🔊</button>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 1 — ACCUEIL
+  ══════════════════════════════════════════ -->
+  <div id="screen-welcome" class="screen active">
+
+    <div class="welcome-top">
+      <div class="xmas-deco" aria-hidden="true">❄ 🎄 ❄</div>
+      <h1 class="main-title">TERMINAL<br>DES ELFES</h1>
+      <p class="main-subtitle">— Système de Sécurité Magique —</p>
+    </div>
+
+    <div class="badge-card">
+      <div class="badge-icon">🏷️</div>
+      <p class="badge-label">Badge d'accès détecté !</p>
+      <p id="teamNameWelcome" class="badge-team"></p>
+    </div>
+
+    <div class="status-row">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span>Accès des Elfes à la Propriété</span>
+    </div>
+    <p class="security-warn">⚠ Sécurité activée — Résolvez l'énigme !</p>
+
+    <button id="btnStart" class="btn-primary">▶  Commencer</button>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 2 — JEU
+  ══════════════════════════════════════════ -->
+  <div id="screen-game" class="screen">
+
+    <!-- Pancarte chrono en haut -->
+    <div class="timer-bar">
+      <div class="timer-label">⏱ TEMPS RESTANT</div>
+      <div id="timerDisplay" class="timer-display">05:00</div>
+    </div>
+
+    <!-- Corps du jeu -->
+    <div class="game-body">
+      <p class="game-title">★ Guirlande Secrète ★</p>
+      <p class="game-instructions">Allumez les ampoules dans le bon ordre&nbsp;!</p>
+
+      <!-- Guirlande avec fil courbé SVG -->
+      <div id="garlandWrap" class="garland-wrap">
+        <svg class="garland-wire-svg" viewBox="0 0 320 24" preserveAspectRatio="none" aria-hidden="true">
+          <!-- Fil principal (ombre) -->
+          <path d="M 8,5 Q 160,22 312,5"
+                stroke="#1a0a04" stroke-width="6" fill="none" stroke-linecap="square" opacity="0.5"/>
+          <!-- Fil principal -->
+          <path d="M 8,3 Q 160,20 312,3"
+                stroke="#7a4818" stroke-width="4" fill="none" stroke-linecap="square"/>
+          <!-- Clous aux extrémités -->
+          <rect x="4"   y="0" width="8" height="8" fill="#aaa" rx="0"/>
+          <rect x="308" y="0" width="8" height="8" fill="#aaa" rx="0"/>
+        </svg>
+        <div id="ledRow" class="led-row" role="group" aria-label="Guirlande de LED"></div>
+      </div>
+
+      <!-- Retour visuel -->
+      <div id="feedbackMsg" class="feedback-msg" role="status" aria-live="polite"></div>
+
+      <!-- Barre de progression -->
+      <div class="progress-wrap">
+        <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="6" aria-valuenow="0">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <p id="progressText" class="progress-text">0 / 6 ampoules allumées</p>
+      </div>
+    </div>
+
+    <!-- Mode test -->
+    <div id="testPanel" class="test-panel hidden">
+      <p class="test-label">★ MODE TEST — Ordre à suivre ★</p>
+      <div id="testOrderDisplay" class="test-order"></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 3 — MENU DES ELFES
+  ══════════════════════════════════════════ -->
+  <div id="screen-menu" class="screen">
+    <canvas id="confettiCanvas" aria-hidden="true"></canvas>
+    <div class="menu-wrap">
+      <header class="menu-header">
+        <div class="menu-title">🔓 Terminal des Elfes</div>
+        <div id="menuTeamDisplay" class="menu-team-display"></div>
+      </header>
+      <div id="menuGrid" class="menu-grid" role="list"></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 4 — PLAN (plein écran depuis le menu)
+  ══════════════════════════════════════════ -->
+  <!-- Bannière connexion Firebase (fixe, toutes les pièces) -->
+  <div id="connectionBanner" class="connection-banner hidden">
+    📡 Connexion aux elfes perdue… Reconnexion en cours…
+  </div>
+
+  <div id="screen-plan" class="screen">
+    <!-- Barre haute : retour au menu + zoom -->
+    <div class="plan-topbar">
+      <button id="btnPlanBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+      <div class="plan-zoom-controls">
+        <button id="btnZoomOut" class="plan-btn" aria-label="Dézoomer">－</button>
+        <span id="planZoomLabel" class="plan-zoom-label">100%</span>
+        <button id="btnZoomIn" class="plan-btn" aria-label="Zoomer">＋</button>
+      </div>
+    </div>
+    <!-- Bannière mission en cours -->
+    <div id="missionBanner" class="mission-banner hidden">
+      <div class="mission-banner-row">
+        <span>🎯 <strong>Mission :</strong> <span id="missionBannerText"></span></span>
+        <button id="missionAbandonBtn" class="mission-abandon-btn">Abandonner</button>
+      </div>
+      <div id="missionAbandonConfirm" class="mission-abandon-confirm hidden">
+        <span>Libérer la pièce pour les autres équipes ?</span>
+        <button id="missionAbandonYes" class="mission-abandon-yes">Oui, abandonner</button>
+        <button id="missionAbandonNo"  class="mission-abandon-no">Non, continuer</button>
+      </div>
+    </div>
+    <!-- Zone de défilement + SVG -->
+    <div id="planViewport" class="plan-viewport">
+      <div id="planSvgWrap" class="plan-svg-wrap"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -12 1184 624" shape-rendering="crispEdges" font-family="'Pixelify Sans','VT323',monospace">
+<title>Plan de la maison</title>
+<style>
+.piece{cursor:pointer}
+.piece .sol{transition:filter .2s}
+.piece:hover .sol{filter:brightness(1.08)}
+.nom{font-size:15px;font-weight:700;fill:#4A2E1E;paint-order:stroke;stroke:#FFF6E4;stroke-width:4px;stroke-linejoin:round;text-anchor:middle;pointer-events:none}
+.deco{pointer-events:none}
+</style>
+<defs>
+<pattern id="bois" width="48" height="16" patternUnits="userSpaceOnUse"><rect width="48" height="16" fill="#DDAE74"/><rect y="7" width="48" height="1" fill="#C8955C"/><rect y="15" width="48" height="1" fill="#C8955C"/><rect x="20" width="1" height="8" fill="#C8955C"/><rect x="40" y="8" width="1" height="8" fill="#C8955C"/></pattern>
+<pattern id="bois2" width="48" height="16" patternUnits="userSpaceOnUse"><rect width="48" height="16" fill="#D3A068"/><rect y="7" width="48" height="1" fill="#BC8750"/><rect y="15" width="48" height="1" fill="#BC8750"/><rect x="12" width="1" height="8" fill="#BC8750"/><rect x="32" y="8" width="1" height="8" fill="#BC8750"/></pattern>
+<pattern id="parquet" width="16" height="48" patternUnits="userSpaceOnUse"><rect width="16" height="48" fill="#C9935A"/><rect x="7" width="1" height="48" fill="#B07C46"/><rect x="15" width="1" height="48" fill="#B07C46"/><rect y="20" width="8" height="1" fill="#B07C46"/><rect x="8" y="40" width="8" height="1" fill="#B07C46"/></pattern>
+<pattern id="carreaux" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#F0E4CB"/><rect width="8" height="8" fill="#E6D5B5"/><rect x="8" y="8" width="8" height="8" fill="#E6D5B5"/></pattern>
+<pattern id="carreaux-eau" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#BFD8D0"/><rect x="11" width="1" height="12" fill="#A6C6BC"/><rect y="11" width="12" height="1" fill="#A6C6BC"/></pattern>
+<pattern id="carreaux-eau2" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#B3D0CB"/><rect x="11" width="1" height="12" fill="#98BDB6"/><rect y="11" width="12" height="1" fill="#98BDB6"/></pattern>
+<pattern id="moquette-rose" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#EBC2B6"/><rect width="1" height="1" fill="#DFAE9F"/><rect x="4" y="4" width="1" height="1" fill="#DFAE9F"/></pattern>
+<pattern id="moquette-sauge" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#BFD3A9"/><rect width="1" height="1" fill="#A9C092"/><rect x="4" y="4" width="1" height="1" fill="#A9C092"/></pattern>
+<pattern id="moquette-brique" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#DDA698"/><rect width="1" height="1" fill="#CC9182"/><rect x="4" y="4" width="1" height="1" fill="#CC9182"/></pattern>
+<pattern id="beton" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="#C4BAA8"/><rect x="5" y="7" width="2" height="2" fill="#B3A894"/><rect x="16" y="17" width="2" height="2" fill="#B3A894"/><rect x="18" y="4" width="1" height="1" fill="#B3A894"/></pattern>
+<pattern id="dalles" width="32" height="32" patternUnits="userSpaceOnUse"><rect width="32" height="32" fill="#D6CDBB"/><rect x="31" width="1" height="32" fill="#BFB49F"/><rect y="31" width="32" height="1" fill="#BFB49F"/></pattern>
+<pattern id="neige" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill="#F4EEE4"/><rect x="6" y="9" width="2" height="2" fill="#FFFFFF"/><rect x="26" y="28" width="2" height="2" fill="#FFFFFF"/><rect x="31" y="6" width="1" height="1" fill="#E6DCCB"/></pattern>
+</defs>
+<rect x="-12" y="-12" width="1184" height="624" fill="url(#neige)"/>
+<g id="pieces">
+<g id="piece-terrasse" class="piece" data-piece="terrasse" data-nom="Terrasse"><polygon class="sol" points="0,420 504,420 504,600 0,600" fill="url(#dalles)"/></g>
+<g id="piece-terrasse-cuisine" class="piece" data-piece="terrasse-cuisine" data-nom="Terrasse"><polygon class="sol" points="308,0 528,0 528,76 308,76" fill="url(#dalles)"/></g>
+<g id="piece-salon" class="piece" data-piece="salon" data-nom="Salon"><polygon class="sol" points="0,76 308,76 308,420 0,420" fill="url(#bois)"/></g>
+<g id="piece-cuisine" class="piece" data-piece="cuisine" data-nom="Cuisine"><polygon class="sol" points="308,76 528,76 528,292 308,292" fill="url(#carreaux)"/></g>
+<g id="piece-chambre-noah" class="piece" data-piece="chambre-noah" data-nom="Chambre de Noah"><polygon class="sol" points="528,76 712,76 712,292 528,292" fill="url(#moquette-sauge)"/></g>
+<g id="piece-chambre-abel" class="piece" data-piece="chambre-abel" data-nom="Chambre d'Abel"><polygon class="sol" points="712,76 900,76 900,292 712,292" fill="url(#moquette-rose)"/></g>
+<g id="piece-garage" class="piece" data-piece="garage" data-nom="Garage"><polygon class="sol" points="900,76 1160,76 1160,600 916,600 916,420 900,420" fill="url(#beton)"/></g>
+<g id="piece-couloir" class="piece" data-piece="couloir" data-nom="Couloir"><polygon class="sol" points="308,292 900,292 900,420 308,420" fill="url(#parquet)"/></g>
+<g id="piece-entree" class="piece" data-piece="entree" data-nom="Entrée"><polygon class="sol" points="504,420 628,420 628,512 504,512" fill="url(#bois2)"/></g>
+<g id="piece-wc" class="piece" data-piece="wc" data-nom="WC"><polygon class="sol" points="504,512 628,512 628,600 504,600" fill="url(#carreaux-eau)"/></g>
+<g id="piece-salle-de-bain" class="piece" data-piece="salle-de-bain" data-nom="Salle de bain"><polygon class="sol" points="628,420 724,420 724,600 628,600" fill="url(#carreaux-eau2)"/></g>
+<g id="piece-chambre-parents" class="piece" data-piece="chambre-parents" data-nom="Chambre des parents"><polygon class="sol" points="724,420 916,420 916,600 724,600" fill="url(#moquette-brique)"/></g>
+</g>
+<g class="deco" id="murs" fill="none" stroke="#5A3A28" stroke-width="8" stroke-linejoin="miter">
+<polygon points="0,76 308,76 308,420 0,420"/>
+<polygon points="308,76 528,76 528,292 308,292"/>
+<polygon points="528,76 712,76 712,292 528,292"/>
+<polygon points="712,76 900,76 900,292 712,292"/>
+<polygon points="900,76 1160,76 1160,600 916,600 916,420 900,420"/>
+<polygon points="308,292 900,292 900,420 308,420"/>
+<polygon points="504,420 628,420 628,512 504,512"/>
+<polygon points="504,512 628,512 628,600 504,600"/>
+<polygon points="628,420 724,420 724,600 628,600"/>
+<polygon points="724,420 916,420 916,600 724,600"/>
+</g>
+<polyline class="deco" points="0,420 0,600 504,600" fill="none" stroke="#A89C86" stroke-width="4" stroke-dasharray="8 4"/>
+<polyline class="deco" points="308,76 308,0 528,0 528,76" fill="none" stroke="#A89C86" stroke-width="4" stroke-dasharray="8 4"/>
+<g class="deco">
+<rect class="deco" x="304" y="320" width="8" height="76" fill="url(#bois)"/>
+<rect class="deco" x="508" y="416" width="116" height="8" fill="url(#bois2)"/>
+<rect class="deco" x="384" y="288" width="48" height="8" fill="#E8C27A"/>
+<rect x="384" y="291" width="48" height="2" fill="#B98A44"/>
+<rect class="deco" x="612" y="288" width="44" height="8" fill="#E8C27A"/>
+<rect x="612" y="291" width="44" height="2" fill="#B98A44"/>
+<rect class="deco" x="780" y="288" width="44" height="8" fill="#E8C27A"/>
+<rect x="780" y="291" width="44" height="2" fill="#B98A44"/>
+<rect class="deco" x="896" y="320" width="8" height="72" fill="#E8C27A"/>
+<rect x="899" y="320" width="2" height="72" fill="#B98A44"/>
+<rect class="deco" x="656" y="416" width="28" height="8" fill="#E8C27A"/>
+<rect x="656" y="419" width="28" height="2" fill="#B98A44"/>
+<rect class="deco" x="788" y="416" width="56" height="8" fill="#E8C27A"/>
+<rect x="788" y="419" width="56" height="2" fill="#B98A44"/>
+<rect class="deco" x="500" y="448" width="8" height="32" fill="#E8C27A"/>
+<rect x="503" y="448" width="2" height="32" fill="#B98A44"/>
+<rect class="deco" x="516" y="508" width="40" height="8" fill="#E8C27A"/>
+<rect x="516" y="511" width="40" height="2" fill="#B98A44"/>
+<rect class="deco" x="36" y="416" width="56" height="8" fill="#E8C27A"/>
+<rect x="36" y="419" width="56" height="2" fill="#B98A44"/>
+<rect class="deco" x="116" y="416" width="72" height="8" fill="#E8C27A"/>
+<rect x="116" y="419" width="72" height="2" fill="#B98A44"/>
+<rect class="deco" x="396" y="72" width="52" height="8" fill="#E8C27A"/>
+<rect x="396" y="75" width="52" height="2" fill="#B98A44"/>
+<rect class="deco" x="976" y="596" width="104" height="8" fill="#E8C27A"/>
+<rect x="976" y="599" width="104" height="2" fill="#B98A44"/>
+<rect class="deco" x="132" y="72" width="64" height="8" fill="#BFE0EA"/>
+<rect x="132" y="75" width="64" height="2" fill="#7FB3C4"/>
+<rect class="deco" x="604" y="72" width="48" height="8" fill="#BFE0EA"/>
+<rect x="604" y="75" width="48" height="2" fill="#7FB3C4"/>
+<rect class="deco" x="796" y="72" width="28" height="8" fill="#BFE0EA"/>
+<rect x="796" y="75" width="28" height="2" fill="#7FB3C4"/>
+<rect class="deco" x="916" y="72" width="48" height="8" fill="#BFE0EA"/>
+<rect x="916" y="75" width="48" height="2" fill="#7FB3C4"/>
+<rect class="deco" x="1156" y="320" width="8" height="56" fill="#BFE0EA"/>
+<rect x="1159" y="320" width="2" height="56" fill="#7FB3C4"/>
+</g>
+<g class="deco" id="meubles"><rect x="8" y="120" width="20" height="160" fill="#8A5A3C"/><rect x="12" y="136" width="8" height="128" fill="#3B2A22"/><rect x="14" y="138" width="4" height="124" fill="#56708A"/><rect x="60" y="150" width="28" height="84" fill="#C4504A"/><rect x="62" y="152" width="24" height="80" fill="#D46A5E"/><rect x="96" y="140" width="44" height="104" fill="#5A3A28"/><rect x="98" y="142" width="40" height="100" fill="#B5524C"/><rect x="126" y="142" width="12" height="100" fill="#9C4440"/><rect x="98" y="142" width="40" height="10" fill="#9C4440"/><rect x="98" y="232" width="40" height="10" fill="#9C4440"/><rect x="104" y="156" width="18" height="36" fill="#C9685F"/><rect x="104" y="196" width="18" height="36" fill="#C9685F"/><rect x="196" y="120" width="10" height="20" fill="#9A6A42"/><rect x="268" y="120" width="10" height="20" fill="#9A6A42"/><rect x="196" y="150" width="10" height="20" fill="#9A6A42"/><rect x="268" y="150" width="10" height="20" fill="#9A6A42"/><rect x="196" y="180" width="10" height="20" fill="#9A6A42"/><rect x="268" y="180" width="10" height="20" fill="#9A6A42"/><rect x="206" y="110" width="62" height="96" fill="#5A3A28"/><rect x="208" y="112" width="58" height="92" fill="#B07A48"/><rect x="214" y="118" width="46" height="80" fill="#BE8853"/><rect x="231" y="150" width="12" height="12" fill="#E8B04B"/><rect x="244" y="300" width="12" height="14" fill="#5E8C5A"/><rect x="238" y="312" width="24" height="14" fill="#4F7D4E"/><rect x="232" y="326" width="36" height="14" fill="#5E8C5A"/><rect x="226" y="342" width="48" height="14" fill="#4F7D4E"/><rect x="220" y="358" width="60" height="14" fill="#5E8C5A"/><rect x="244" y="372" width="12" height="14" fill="#7A4E30"/><rect x="246" y="294" width="8" height="8" fill="#E8B04B"/><rect x="244" y="318" width="4" height="4" fill="#C4504A"/><rect x="256" y="332" width="4" height="4" fill="#E8B04B"/><rect x="234" y="348" width="4" height="4" fill="#C4504A"/><rect x="264" y="352" width="4" height="4" fill="#E8B04B"/><rect x="248" y="362" width="4" height="4" fill="#C4504A"/><rect x="36" y="350" width="40" height="36" fill="#5A3A28"/><rect x="38" y="352" width="36" height="32" fill="#5E8C5A"/><rect x="38" y="352" width="36" height="8" fill="#4F7D4E"/><rect x="312" y="80" width="140" height="28" fill="#5A3A28"/><rect x="314" y="82" width="136" height="24" fill="#E9DCC2"/><rect x="314" y="102" width="136" height="4" fill="#C9B896"/><rect x="312" y="80" width="28" height="150" fill="#5A3A28"/><rect x="314" y="82" width="24" height="146" fill="#E9DCC2"/><rect x="360" y="86" width="20" height="14" fill="#9EB6B8"/><rect x="410" y="86" width="16" height="16" fill="#5A4A42"/><rect x="430" y="86" width="16" height="16" fill="#5A4A42"/><rect x="488" y="80" width="36" height="40" fill="#5A3A28"/><rect x="490" y="82" width="32" height="36" fill="#F6F2EA"/><rect x="492" y="98" width="28" height="1" fill="#C9C2B4"/><rect x="396" y="180" width="52" height="44" fill="#5A3A28"/><rect x="398" y="182" width="48" height="40" fill="#B07A48"/><rect x="406" y="170" width="12" height="10" fill="#9A6A42"/><rect x="428" y="170" width="12" height="10" fill="#9A6A42"/><rect x="406" y="224" width="12" height="10" fill="#9A6A42"/><rect x="428" y="224" width="12" height="10" fill="#9A6A42"/><rect x="536" y="84" width="52" height="88" fill="#5A3A28"/><rect x="538" y="86" width="48" height="84" fill="#F6F2EA"/><rect x="538" y="114" width="48" height="56" fill="#5E8C5A"/><rect x="538" y="114" width="48" height="6" fill="#4F7D4E"/><rect x="544" y="90" width="36" height="16" fill="#FFF6E4"/><rect x="664" y="84" width="40" height="24" fill="#5A3A28"/><rect x="666" y="86" width="36" height="20" fill="#B07A48"/><rect x="540" y="240" width="32" height="24" fill="#5A3A28"/><rect x="542" y="242" width="28" height="20" fill="#C4504A"/><rect x="542" y="250" width="28" height="4" fill="#E8B04B"/><rect x="840" y="84" width="52" height="88" fill="#5A3A28"/><rect x="842" y="86" width="48" height="84" fill="#F6F2EA"/><rect x="842" y="114" width="48" height="56" fill="#C4504A"/><rect x="842" y="114" width="48" height="6" fill="#A8443E"/><rect x="848" y="90" width="36" height="16" fill="#FFF6E4"/><rect x="720" y="84" width="40" height="24" fill="#5A3A28"/><rect x="722" y="86" width="36" height="20" fill="#B07A48"/><rect x="724" y="232" width="36" height="36" fill="#E8B04B"/><rect x="730" y="238" width="24" height="24" fill="#5E8C5A"/><rect x="816" y="512" width="92" height="84" fill="#5A3A28"/><rect x="818" y="514" width="88" height="80" fill="#F6F2EA"/><rect x="818" y="540" width="88" height="54" fill="#E8B04B"/><rect x="818" y="540" width="88" height="6" fill="#C99536"/><rect x="824" y="520" width="34" height="16" fill="#FFF6E4"/><rect x="866" y="520" width="34" height="16" fill="#FFF6E4"/><rect x="730" y="548" width="36" height="44" fill="#5A3A28"/><rect x="732" y="550" width="32" height="40" fill="#9A6A42"/><rect x="632" y="548" width="88" height="48" fill="#5A3A28"/><rect x="634" y="550" width="84" height="44" fill="#F6F2EA"/><rect x="640" y="556" width="72" height="32" fill="#9CC6D0"/><rect x="684" y="428" width="36" height="28" fill="#5A3A28"/><rect x="686" y="430" width="32" height="24" fill="#F6F2EA"/><rect x="694" y="436" width="16" height="12" fill="#9CC6D0"/><rect x="588" y="556" width="32" height="40" fill="#5A3A28"/><rect x="590" y="558" width="28" height="10" fill="#F6F2EA"/><rect x="592" y="568" width="24" height="24" fill="#F6F2EA"/><rect x="598" y="574" width="12" height="12" fill="#9CC6D0"/><rect x="510" y="566" width="28" height="24" fill="#5A3A28"/><rect x="512" y="568" width="24" height="20" fill="#F6F2EA"/><rect x="518" y="572" width="12" height="10" fill="#9CC6D0"/><rect x="980" y="120" width="100" height="190" fill="#5A3A28"/><rect x="982" y="122" width="96" height="186" fill="#C4504A"/><rect x="992" y="146" width="76" height="38" fill="#9CC6D0"/><rect x="992" y="262" width="76" height="28" fill="#9CC6D0"/><rect x="988" y="196" width="84" height="56" fill="#B5524C"/><rect x="976" y="140" width="8" height="24" fill="#3B2A22"/><rect x="1076" y="140" width="8" height="24" fill="#3B2A22"/><rect x="976" y="270" width="8" height="24" fill="#3B2A22"/><rect x="1076" y="270" width="8" height="24" fill="#3B2A22"/><rect x="924" y="436" width="28" height="140" fill="#5A3A28"/><rect x="926" y="438" width="24" height="136" fill="#9A6A42"/><rect x="928" y="456" width="20" height="10" fill="#E8B04B"/><rect x="928" y="486" width="20" height="10" fill="#E8B04B"/><rect x="928" y="516" width="20" height="10" fill="#E8B04B"/><rect x="928" y="546" width="20" height="10" fill="#E8B04B"/><rect x="330" y="358" width="540" height="26" fill="#C4504A"/><rect x="334" y="362" width="532" height="18" fill="#D46A5E"/><rect x="342" y="369" width="8" height="4" fill="#E8B04B"/><rect x="366" y="369" width="8" height="4" fill="#E8B04B"/><rect x="390" y="369" width="8" height="4" fill="#E8B04B"/><rect x="414" y="369" width="8" height="4" fill="#E8B04B"/><rect x="438" y="369" width="8" height="4" fill="#E8B04B"/><rect x="462" y="369" width="8" height="4" fill="#E8B04B"/><rect x="486" y="369" width="8" height="4" fill="#E8B04B"/><rect x="510" y="369" width="8" height="4" fill="#E8B04B"/><rect x="534" y="369" width="8" height="4" fill="#E8B04B"/><rect x="558" y="369" width="8" height="4" fill="#E8B04B"/><rect x="582" y="369" width="8" height="4" fill="#E8B04B"/><rect x="606" y="369" width="8" height="4" fill="#E8B04B"/><rect x="630" y="369" width="8" height="4" fill="#E8B04B"/><rect x="654" y="369" width="8" height="4" fill="#E8B04B"/><rect x="678" y="369" width="8" height="4" fill="#E8B04B"/><rect x="702" y="369" width="8" height="4" fill="#E8B04B"/><rect x="726" y="369" width="8" height="4" fill="#E8B04B"/><rect x="750" y="369" width="8" height="4" fill="#E8B04B"/><rect x="774" y="369" width="8" height="4" fill="#E8B04B"/><rect x="798" y="369" width="8" height="4" fill="#E8B04B"/><rect x="822" y="369" width="8" height="4" fill="#E8B04B"/><rect x="846" y="369" width="8" height="4" fill="#E8B04B"/><rect x="580" y="428" width="36" height="10" fill="#7A4E30"/><rect x="584" y="438" width="6" height="12" fill="#C4504A"/><rect x="596" y="438" width="6" height="12" fill="#5E8C5A"/><rect x="608" y="438" width="6" height="12" fill="#C4504A"/><rect x="200" y="476" width="64" height="48" fill="#5A3A28"/><rect x="202" y="478" width="60" height="44" fill="#B07A48"/><rect x="186" y="490" width="12" height="16" fill="#9A6A42"/><rect x="266" y="490" width="12" height="16" fill="#9A6A42"/><rect x="20" y="452" width="24" height="24" fill="#9A6A42"/><rect x="24" y="446" width="16" height="16" fill="#5E8C5A"/><rect x="28" y="442" width="8" height="8" fill="#4F7D4E"/><rect x="440" y="452" width="24" height="24" fill="#9A6A42"/><rect x="444" y="446" width="16" height="16" fill="#5E8C5A"/><rect x="448" y="442" width="8" height="8" fill="#4F7D4E"/><rect x="20" y="560" width="24" height="24" fill="#9A6A42"/><rect x="24" y="554" width="16" height="16" fill="#5E8C5A"/><rect x="28" y="550" width="8" height="8" fill="#4F7D4E"/><rect x="330" y="24" width="24" height="24" fill="#9A6A42"/><rect x="334" y="18" width="16" height="16" fill="#5E8C5A"/><rect x="338" y="14" width="8" height="8" fill="#4F7D4E"/></g>
+<g id="noms">
+<text class="nom" x="110" y="520">Terrasse</text>
+<text class="nom" x="460" y="44">Terrasse</text>
+<text class="nom" x="154" y="300">Salon</text>
+<text class="nom" x="418" y="140">Cuisine</text>
+<text class="nom" x="620" y="200"><tspan x="620">Chambre</tspan><tspan x="620" dy="17">de Noah</tspan></text>
+<text class="nom" x="806" y="200"><tspan x="806">Chambre</tspan><tspan x="806" dy="17">d'Abel</tspan></text>
+<text class="nom" x="1030" y="360">Garage</text>
+<text class="nom" x="604" y="326">Couloir</text>
+<text class="nom" x="566" y="490">Entrée</text>
+<text class="nom" x="548" y="548">WC</text>
+<text class="nom" x="676" y="480"><tspan x="676">Salle</tspan><tspan x="676" dy="17">de bain</tspan></text>
+<text class="nom" x="800" y="456"><tspan x="800">Chambre des</tspan><tspan x="800" dy="17">parents</tspan></text>
+</g></svg></div>
+    </div>
+    <!-- Dialog de scan -->
+    <div id="scanDialog" class="scan-dialog hidden" aria-live="polite">
+      <div class="scan-header">
+        <span class="scan-icon" aria-hidden="true">▶</span>
+        <span class="scan-label-text">SCAN :</span>
+        <span id="scanRoomName" class="scan-room-name"></span>
+      </div>
+      <div id="scanMsg" class="scan-msg"></div>
+      <div id="scanObjectWrap" class="scan-object-wrap hidden">
+        <div id="scanObjectIcon" class="scan-object-icon"></div>
+        <div id="scanObjectMsg" class="scan-object-msg"></div>
+        <div id="scanObjectWarning" class="scan-object-warning hidden"></div>
+      </div>
+      <!-- Confirm mission Firebase -->
+      <div id="scanLockConfirm" class="scan-lock-confirm hidden">
+        <div class="scan-lock-question">Voulez-vous partir chercher cet objet ?</div>
+        <div class="scan-lock-btns">
+          <button id="scanLockYes" class="scan-lock-yes">🏃 Oui, on y va !</button>
+          <button id="scanLockNo"  class="scan-lock-no">🔍 Non, on continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 4 — ÉCHEC
+  ══════════════════════════════════════════ -->
+  <div id="screen-failure" class="screen">
+    <div class="failure-icon" aria-hidden="true">🔒</div>
+    <h2 class="failure-title">Accès Refusé !</h2>
+    <p class="failure-msg">Les elfes ont changé<br>le code de sécurité !</p>
+    <p class="failure-sub">Ne vous découragez pas !</p>
+    <button id="btnRetry" class="btn-primary btn-retry">🔄  Réessayer</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 5 — ERREUR TAG NFC
+  ══════════════════════════════════════════ -->
+  <div id="screen-tag-error" class="screen">
+    <div class="tag-error-box">
+      <div class="tag-error-icon">⚠️</div>
+      <div id="tagErrorMsg" class="tag-error-msg">Erreur de tag.</div>
+      <div class="tag-error-hint">Ouvrez d'abord le lien NFC de votre badge d'équipe.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 6 — DÉBLOCAGE OUTIL
+  ══════════════════════════════════════════ -->
+  <div id="screen-unlock" class="screen">
+    <canvas id="unlockCanvas" aria-hidden="true"></canvas>
+    <div class="unlock-box">
+      <div class="unlock-lock-anim" aria-hidden="true">🔓</div>
+      <div class="unlock-title">Nouvel outil débloqué !</div>
+      <div id="unlockItemName" class="unlock-item-name"></div>
+      <div class="unlock-sparkles" aria-hidden="true">★ ✨ ★</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 7 — RADIO
+  ══════════════════════════════════════════ -->
+  <div id="screen-radio" class="screen">
+    <div class="plan-topbar">
+      <button id="btnRadioBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+      <button id="btnRadioReplay" class="plan-back-btn radio-replay-btn hidden" aria-label="Réécouter le message">▶ Réécouter</button>
+    </div>
+    <div class="radio-body">
+      <div class="radio-brand-bar">📻 RADIO DU PÔLE NORD</div>
+      <div class="radio-display-panel">
+        <div class="radio-freq-row">
+          <span class="radio-freq-arrow">«</span>
+          <span id="radioFreqValue" class="radio-freq-num">99.1</span>
+          <span class="radio-freq-fm">FM</span>
+          <span class="radio-freq-arrow">»</span>
+        </div>
+        <div class="radio-signal-row">
+          <div id="radioSignalLeds" class="radio-leds"></div>
+          <span id="radioOnAir" class="radio-on-air hidden">● ON AIR</span>
+        </div>
+      </div>
+      <div id="radioSubtitleBox" class="radio-subtitle-box hidden" aria-live="polite"></div>
+      <div class="radio-dial-section">
+        <span class="radio-band-label">88</span>
+        <canvas id="radioDial" width="180" height="180" aria-label="Cadran de fréquence, tournez pour changer"></canvas>
+        <span class="radio-band-label">108</span>
+      </div>
+      <div class="radio-band-wrap">
+        <div class="radio-band-track">
+          <div id="radioBandNeedle" class="radio-band-needle"></div>
+          <div id="radioStationMarkers" class="radio-station-markers"></div>
+        </div>
+      </div>
+      <div id="radioStationName" class="radio-station-name"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 8 — CARNET DE L'ELFE
+  ══════════════════════════════════════════ -->
+  <div id="screen-carnet" class="screen">
+    <div class="plan-topbar">
+      <button id="btnCarnetBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+    </div>
+    <div class="carnet-body">
+      <div class="carnet-title-row">
+        <span class="carnet-icon" aria-hidden="true">📓</span>
+        <span class="carnet-title">Carnet de l'Elfe</span>
+      </div>
+      <div id="carnetEntries" class="carnet-entries"></div>
+      <div id="carnetEmpty" class="carnet-empty">Aucun indice collecté pour l'instant…</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 9 — LIVRE DE RECETTES (ÉNIGME)
+  ══════════════════════════════════════════ -->
+  <div id="screen-puzzle" class="screen">
+    <div class="plan-topbar">
+      <button id="btnPuzzleBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+    </div>
+    <div id="recettesProgress" class="recettes-progress hidden">
+      <div id="rslot-0" class="recettes-plate-slot"></div>
+      <div id="rslot-1" class="recettes-plate-slot"></div>
+      <div id="rslot-2" class="recettes-plate-slot"></div>
+    </div>
+    <div class="puzzle-book-wrap">
+      <div id="puzzleBook" class="puzzle-book">
+        <!-- Page gauche : énigme -->
+        <div class="puzzle-book-page puzzle-page-left">
+          <div id="recettesTableWrap" class="recettes-table-wrap hidden"></div>
+          <div id="puzzleTitle" class="puzzle-book-title"></div>
+          <div id="puzzleText" class="puzzle-enigma-text"></div>
+          <img id="puzzleImg" class="puzzle-enigma-img hidden" alt="" />
+          <button id="puzzleHintBtn" class="puzzle-hint-btn hidden">💡 Un coup de pouce ?</button>
+          <div id="puzzleHintText" class="puzzle-hint-text hidden"></div>
+        </div>
+        <!-- Reliure -->
+        <div class="puzzle-book-spine" aria-hidden="true"></div>
+        <!-- Page droite : réponse -->
+        <div class="puzzle-book-page puzzle-page-right">
+          <div id="puzzleSuccessArea" class="puzzle-success-area hidden" aria-live="polite">
+            <div class="puzzle-success-icon" aria-hidden="true">✨</div>
+            <div id="puzzleSuccessMsg" class="puzzle-success-msg"></div>
+            <div id="puzzleAnswerDisplay" class="puzzle-answer-display"></div>
+            <div id="puzzleCarnetNotif" class="puzzle-carnet-notif"></div>
+          </div>
+          <div id="recettesStepSuccessArea" class="recettes-step-success hidden" aria-live="polite">
+            <div id="recettesStepDishWrap" class="recettes-step-dish"></div>
+            <div id="recettesStepMsg" class="recettes-step-msg"></div>
+          </div>
+          <div id="puzzleInputArea" class="puzzle-input-area">
+            <label class="puzzle-input-label" for="puzzleInput">Votre réponse :</label>
+            <input id="puzzleInput" type="text" class="puzzle-input"
+                   placeholder="…" autocomplete="off" autocapitalize="off"
+                   spellcheck="false" aria-label="Réponse à l'énigme" />
+            <button id="puzzleSubmitBtn" class="puzzle-submit-btn">✓ Valider</button>
+            <div id="puzzleErrorMsg" class="puzzle-error-msg hidden" role="alert" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button id="recettes-test-btn" class="hidden" style="margin:6px auto;display:block;">🧪 Auto-répondre</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 10 — CARILLON DES ELFES
+  ══════════════════════════════════════════ -->
+  <div id="screen-carillon" class="screen">
+    <div class="plan-topbar">
+      <button id="btnCarillonBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+    </div>
+    <div class="carillon-body">
+      <svg id="carillonBoxSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 180"
+           shape-rendering="crispEdges" class="carillon-box-svg" aria-hidden="true">
+        <!-- Lid (y=0-82): golden interior panel -->
+        <rect x="8" y="0" width="184" height="82" fill="#5A3A28"/>
+        <rect x="9" y="1" width="182" height="80" fill="#7A4A28"/>
+        <rect x="10" y="2" width="180" height="78" fill="#D4A840"/>
+        <rect x="12" y="4" width="176" height="74" fill="#C89830"/>
+        <rect x="14" y="6" width="172" height="4" fill="#E8C040"/>
+        <rect x="14" y="72" width="172" height="4" fill="#E8C040"/>
+        <rect x="14" y="6" width="4" height="70" fill="#E8C040"/>
+        <rect x="182" y="6" width="4" height="70" fill="#E8C040"/>
+        <!-- Hinge -->
+        <rect x="8" y="82" width="184" height="6" fill="#3A1808"/>
+        <rect x="20" y="83" width="10" height="4" fill="#D4A840"/>
+        <rect x="90" y="83" width="10" height="4" fill="#D4A840"/>
+        <rect x="160" y="83" width="10" height="4" fill="#D4A840"/>
+        <!-- Box body (y=88-176) -->
+        <rect x="8" y="88" width="184" height="88" fill="#5A3A28"/>
+        <rect x="9" y="89" width="182" height="86" fill="#7A4A28"/>
+        <rect x="10" y="90" width="180" height="84" fill="#D4A840"/>
+        <rect x="12" y="92" width="176" height="4" fill="#E8C040"/>
+        <rect x="12" y="162" width="176" height="4" fill="#C49030"/>
+        <rect x="10" y="168" width="180" height="6" fill="#8B5A28"/>
+        <rect x="8" y="172" width="184" height="4" fill="#5A3A28"/>
+        <!-- Red cylinder -->
+        <rect x="20" y="98" width="152" height="58" fill="#C4504A"/>
+        <rect x="20" y="98" width="152" height="6" fill="#D46A5E"/>
+        <rect x="20" y="150" width="152" height="6" fill="#A83828"/>
+        <!-- Cylinder pins -->
+        <rect x="30" y="102" width="6" height="42" fill="#D4A840"/>
+        <rect x="46" y="106" width="6" height="38" fill="#D4A840"/>
+        <rect x="62" y="102" width="6" height="42" fill="#D4A840"/>
+        <rect x="78" y="106" width="6" height="38" fill="#D4A840"/>
+        <rect x="94" y="102" width="6" height="42" fill="#D4A840"/>
+        <rect x="110" y="106" width="6" height="38" fill="#D4A840"/>
+        <rect x="126" y="102" width="6" height="42" fill="#D4A840"/>
+        <rect x="142" y="106" width="6" height="38" fill="#D4A840"/>
+        <!-- Winding key -->
+        <rect x="194" y="112" width="6" height="4" fill="#7A4A28"/>
+        <rect x="195" y="104" width="4" height="20" fill="#D4A840"/>
+        <rect x="193" y="116" width="6" height="4" fill="#7A4A28"/>
+        <!-- Decorative notes in lid corners -->
+        <rect x="22" y="20" width="4" height="12" fill="#E8B04B" opacity="0.7"/>
+        <rect x="26" y="20" width="8" height="4" fill="#E8B04B" opacity="0.7"/>
+        <rect x="26" y="28" width="4" height="4" fill="#E8B04B" opacity="0.7"/>
+        <rect x="168" y="16" width="4" height="12" fill="#E8B04B" opacity="0.7"/>
+        <rect x="172" y="16" width="8" height="4" fill="#E8B04B" opacity="0.7"/>
+        <rect x="172" y="24" width="4" height="4" fill="#E8B04B" opacity="0.7"/>
+        <!-- ELF GROUP (centered in lid area, y=6-71) -->
+        <g id="carillonElf">
+          <!-- Hat -->
+          <rect x="97" y="8" width="6" height="2" fill="#C44040"/>
+          <rect x="94" y="10" width="12" height="4" fill="#C44040"/>
+          <rect x="91" y="14" width="18" height="4" fill="#C44040"/>
+          <rect x="99" y="6" width="2" height="2" fill="#E8C040"/>
+          <rect x="89" y="18" width="22" height="3" fill="#E8B04B"/>
+          <!-- Head -->
+          <rect x="91" y="21" width="18" height="2" fill="#F0C880"/>
+          <rect x="89" y="23" width="22" height="12" fill="#F0C880"/>
+          <rect x="91" y="35" width="18" height="2" fill="#F0C880"/>
+          <rect x="87" y="24" width="2" height="6" fill="#F0C880"/>
+          <rect x="85" y="26" width="2" height="2" fill="#F0C880"/>
+          <rect x="111" y="24" width="2" height="6" fill="#F0C880"/>
+          <rect x="113" y="26" width="2" height="2" fill="#F0C880"/>
+          <!-- Eyes -->
+          <rect x="93" y="27" width="4" height="3" fill="#3A1808"/>
+          <rect x="103" y="27" width="4" height="3" fill="#3A1808"/>
+          <!-- Nose -->
+          <rect x="99" y="31" width="2" height="2" fill="#E09060"/>
+          <!-- Smile -->
+          <rect x="95" y="33" width="10" height="2" fill="#3A1808"/>
+          <rect x="93" y="34" width="2" height="1" fill="#3A1808"/>
+          <rect x="105" y="34" width="2" height="1" fill="#3A1808"/>
+          <!-- Cheeks -->
+          <rect x="91" y="31" width="4" height="3" fill="#E8A080" opacity="0.5"/>
+          <rect x="105" y="31" width="4" height="3" fill="#E8A080" opacity="0.5"/>
+          <!-- Body -->
+          <rect x="89" y="37" width="22" height="22" fill="#508038"/>
+          <rect x="91" y="38" width="18" height="20" fill="#608848"/>
+          <rect x="99" y="42" width="2" height="2" fill="#E8B04B"/>
+          <rect x="99" y="47" width="2" height="2" fill="#E8B04B"/>
+          <rect x="99" y="52" width="2" height="2" fill="#E8B04B"/>
+          <rect x="89" y="55" width="22" height="3" fill="#D4A840"/>
+          <rect x="98" y="54" width="4" height="5" fill="#E8B04B"/>
+          <!-- Arms -->
+          <rect x="77" y="40" width="12" height="5" fill="#508038"/>
+          <rect x="75" y="38" width="6" height="5" fill="#F0C880"/>
+          <rect x="111" y="40" width="12" height="5" fill="#508038"/>
+          <rect x="119" y="38" width="6" height="5" fill="#F0C880"/>
+          <!-- Legs -->
+          <rect x="91" y="58" width="6" height="10" fill="#D4A840"/>
+          <rect x="103" y="58" width="6" height="10" fill="#D4A840"/>
+          <!-- Shoes -->
+          <rect x="88" y="66" width="10" height="4" fill="#C44040"/>
+          <rect x="100" y="66" width="10" height="4" fill="#C44040"/>
+          <rect x="94" y="68" width="6" height="2" fill="#A83828"/>
+          <rect x="106" y="68" width="6" height="2" fill="#A83828"/>
+        </g>
+      </svg>
+
+      <button id="btnEcouterMelodie" class="carillon-listen-btn">🎵 Écouter la mélodie</button>
+
+      <div id="carillonProgress" class="carillon-progress" aria-label="Progression de la mélodie" role="status"></div>
+
+      <div id="carillonBellsRow" class="carillon-bells-row" role="group" aria-label="Clochettes du carillon"></div>
+
+      <div id="carillonSuccessArea" class="carillon-success-area hidden" aria-live="polite">
+        <div id="carillonSuccessMsg" class="carillon-success-msg"></div>
+        <div id="carillonCarnetNotif" class="carillon-carnet-notif"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ÉCRAN 11 — BOUGIE DES ELFES
+  ══════════════════════════════════════════ -->
+  <div id="screen-bougie" class="screen bougie-screen">
+    <div class="plan-topbar">
+      <button id="btnBougieBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+    </div>
+
+    <!-- Phase 1 : Préparation -->
+    <div id="bougie-prep" class="bougie-prep-wrap">
+      <!-- Construit dynamiquement par _buildBougiePrep() -->
+    </div>
+
+    <!-- Phase 2 : Puzzle (nuit) -->
+    <div id="bougie-puzzle" class="bougie-puzzle-wrap hidden">
+      <div id="bougie-instructions" class="bougie-instructions"></div>
+      <div id="bougie-svg-wrap" class="bougie-svg-wrap"></div>
+      <div id="bougie-progress" class="bougie-progress-display"></div>
+      <div id="bougie-message" class="bougie-message hidden"></div>
+      <div id="bougie-test-btns" class="bougie-test-btns hidden"></div>
+    </div>
+  </div>
+
+  <!-- Screen 12 : Mini-Forêt des Elfes -->
+  <div id="screen-foret" class="screen foret-screen">
+    <div class="plan-topbar">
+      <button id="btnForetBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+    </div>
+
+    <div class="foret-content">
+      <div id="foret-svg-wrap" class="foret-svg-wrap"></div>
+      <div id="foret-consigne" class="foret-consigne"></div>
+
+      <div id="foret-input-area" class="foret-input-area hidden">
+        <input type="number" id="foretInput" class="foret-input" inputmode="numeric" pattern="[0-9]*" min="1" max="999" placeholder="?">
+        <button id="foretSubmitBtn" class="foret-submit-btn">Valider</button>
+      </div>
+      <div id="foret-test-hint" class="foret-test-hint hidden"></div>
+      <div id="foret-error-msg" class="foret-error-msg hidden"></div>
+      <div id="foret-cooldown" class="foret-cooldown hidden"></div>
+      <div id="foret-success" class="foret-success hidden"></div>
+    </div>
+  </div>
+
+  <div id="screen-traducteur" class="screen trad-screen">
+    <div class="plan-topbar">
+      <button id="btnTradBack" class="plan-back-btn" aria-label="Retour au menu">◀ Menu</button>
+    </div>
+
+    <div class="trad-content">
+      <h2 class="trad-title">Le Traducteur Elfique</h2>
+
+      <div id="tradGrimoire" class="trad-grimoire">
+        <div class="trad-section-label">✦ Mots-indices ✦</div>
+        <div id="tradHints" class="trad-hints-row"></div>
+        <div class="trad-divider"></div>
+        <div class="trad-section-label">✦ Alphabet elfique ✦</div>
+        <div id="tradGrid" class="trad-grid"></div>
+      </div>
+
+      <div id="trad-answer-section" class="trad-answer-section">
+        <div class="trad-prompt"></div>
+        <div class="trad-answer-row">
+          <input id="tradAnswerInput" class="trad-answer-input" type="text" placeholder="…" autocomplete="off" autocorrect="off" spellcheck="false">
+          <button id="tradAnswerBtn" class="trad-answer-btn">Valider</button>
+        </div>
+      </div>
+
+      <div class="trad-hint-btn-wrap">
+        <button id="tradHintBtn" class="trad-hint-btn hidden">✨ Aide des elfes</button>
+      </div>
+      <button id="trad-test-btn" class="trad-test-btn hidden">🧪 Remplir le tableau</button>
+
+      <div id="trad-error" class="trad-error hidden"></div>
+      <div id="trad-success" class="trad-success hidden"></div>
+      <div id="trad-snowflakes" class="trad-snowflakes"></div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK (Realtime Database) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="app.js?v=11"></script>
+</body>
+</html>

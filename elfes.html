@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧝 Tableau de bord Elfes</title>
+  <style>
+    :root { --bg: #0d0a18; --card: #1a1530; --border: #3a2a60; --gold: #d89830; --green: #3a8030; --red: #8B1A1A; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: var(--bg); color: #e8dcc0; font-family: monospace; min-height: 100vh; }
+
+    /* Auth screen */
+    #authScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; padding: 20px; }
+    #authScreen h1 { color: var(--gold); font-size: 22px; margin: 0; }
+    #authInput { background: var(--card); border: 2px solid var(--border); color: #e8dcc0; font-family: monospace; font-size: 16px; padding: 10px 14px; width: 100%; max-width: 320px; text-align: center; }
+    #authBtn { background: var(--green); border: 2px solid #5ab040; color: #d8f0c8; font-family: monospace; font-size: 15px; padding: 10px 24px; cursor: pointer; }
+    #authErr { color: #e05050; font-size: 13px; }
+
+    /* Dashboard */
+    #dashboard { display: none; padding: 16px; max-width: 700px; margin: 0 auto; }
+    h1 { color: var(--gold); font-size: 18px; margin: 0 0 4px; }
+    h2 { color: #c0a060; font-size: 14px; margin: 20px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .dot-on  { background: #50c040; }
+    .dot-off { background: #c04030; }
+
+    /* Rooms table */
+    .room-grid { display: grid; gap: 8px; }
+    .room-card { background: var(--card); border: 1px solid var(--border); padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .room-name { font-weight: bold; font-size: 14px; color: #f0dca8; flex: 1; min-width: 100px; }
+    .room-status { font-size: 13px; }
+    .status-free  { color: #50c040; }
+    .status-locked { color: #e05050; }
+    .room-since { font-size: 11px; color: #a09070; }
+    .room-timeout { font-size: 11px; color: #e08030; }
+    .btn-unlock { background: var(--red); border: 1px solid #c03020; color: #fff; font-family: monospace; font-size: 12px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+    .btn-unlock:hover { background: #a02010; }
+
+    /* Progress */
+    .teams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .team-card  { background: var(--card); border: 1px solid var(--border); padding: 10px; }
+    .team-name  { font-weight: bold; color: var(--gold); font-size: 13px; margin-bottom: 6px; }
+    .tool-list  { font-size: 12px; line-height: 1.8; }
+    .tool-done  { color: #50c040; }
+    .tool-miss  { color: #605040; }
+
+    /* Danger zone */
+    .danger-zone { background: #200810; border: 2px solid var(--red); padding: 14px; margin-top: 20px; }
+    .danger-zone h2 { color: #e05050; margin: 0 0 10px; border-color: #602020; }
+    .btn-reset { background: var(--red); border: 2px solid #c03020; color: #fff; font-family: monospace; font-size: 14px; padding: 10px 20px; cursor: pointer; width: 100%; }
+    .btn-reset:hover { background: #a02010; }
+    #resetConfirm { margin-top: 10px; display: none; }
+    #resetConfirm p { color: #e08080; font-size: 13px; margin: 0 0 8px; }
+    .reset-btns { display: flex; gap: 8px; }
+    .btn-confirm-yes { background: var(--red); border: 2px solid #c03020; color: #fff; font-family: monospace; font-size: 13px; padding: 8px 16px; cursor: pointer; }
+    .btn-confirm-no  { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #c8b888; font-family: monospace; font-size: 13px; padding: 8px 16px; cursor: pointer; }
+
+    #log { margin-top: 10px; font-size: 12px; color: #907050; min-height: 20px; }
+    #connStatus { font-size: 12px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<!-- ══════ Authentification ══════ -->
+<div id="authScreen">
+  <h1>🧝 Accès Elfes</h1>
+  <p style="font-size:13px;color:#907050;margin:0">Réservé aux organisatrices</p>
+  <input id="authInput" type="password" placeholder="Mot de passe…" autocomplete="off">
+  <button id="authBtn">Entrer</button>
+  <div id="authErr"></div>
+</div>
+
+<!-- ══════ Tableau de bord ══════ -->
+<div id="dashboard">
+  <h1>🧝 Tableau de bord — Elfes</h1>
+  <div id="connStatus"><span class="status-dot dot-off" id="connDot"></span><span id="connTxt">Connexion…</span></div>
+
+  <h2>📍 État des pièces</h2>
+  <div id="roomGrid" class="room-grid">
+    <div style="color:#706050;font-size:13px">Chargement…</div>
+  </div>
+
+  <h2>🏆 Progression des équipes</h2>
+  <div id="teamsGrid" class="teams-grid">
+    <div style="color:#706050;font-size:13px">Chargement…</div>
+  </div>
+
+  <div class="danger-zone">
+    <h2>⚠️ Zone Danger</h2>
+    <button class="btn-reset" onclick="showResetConfirm()">🗑️ Réinitialiser tous les verrous Firebase</button>
+    <div id="resetConfirm">
+      <p>Cela libère toutes les pièces pour toutes les équipes. Cette action est irréversible.</p>
+      <div class="reset-btns">
+        <button class="btn-confirm-yes" onclick="doReset()">Oui, tout réinitialiser</button>
+        <button class="btn-confirm-no"  onclick="hideResetConfirm()">Annuler</button>
+      </div>
+    </div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════
+   CONFIGURATION — copiez les mêmes valeurs que dans app.js
+   ════════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyABJl-EEifHMsSGFgeZsTeOQODCMsTwJg8",
+  authDomain:        "escape-noel-9a1f2.firebaseapp.com",
+  databaseURL:       "https://escape-noel-9a1f2-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "escape-noel-9a1f2",
+  storageBucket:     "escape-noel-9a1f2.firebasestorage.app",
+  messagingSenderId: "366865765699",
+  appId:             "1:366865765699:web:b42fb49fddb055553c0bf6",
+};
+const ELFES_PASSWORD = 'NOELELFES2024'; // même valeur que CONFIG.firebase.elfesPassword dans app.js
+
+/* ═══ Noms des équipes ═══ */
+const TEAM_NAMES = { 1: 'Équipe des Rennes', 2: 'Équipe des Sapins', 3: 'Équipe des Étoiles' };
+
+/* ═══ Pièces connues ═══ */
+const ROOMS = [
+  { id: 'garage',          label: 'Garage'          },
+  { id: 'cuisine',         label: 'Cuisine'          },
+  { id: 'chambre-parents', label: 'Chambre parents'  },
+  { id: 'salle-de-bain',   label: 'Salle de bain'    },
+  { id: 'chambre-abel',    label: 'Chambre Abel'      },
+  { id: 'chambre-noah',    label: 'Chambre Noah'      },
+];
+
+/* ═══ Outils / puzzle keys ═══ */
+const TOOLS = [
+  { key: 'radio',      label: '📻 Radio'              },
+  { key: 'recettes',   label: '📖 Livre de recettes'  },
+  { key: 'bougie',     label: '🕯️ Bougie des Elfes'  },
+  { key: 'traducteur', label: '🧝 Traducteur Elfique' },
+  { key: 'carillon',   label: '🎵 Carillon'           },
+  { key: 'foret',      label: '🌲 Mini-Forêt'         },
+];
+
+/* ════ Auth ════ */
+let db = null;
+let roomsData   = {};
+let progressData = {};
+
+document.getElementById('authInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryAuth();
+});
+document.getElementById('authBtn').addEventListener('click', tryAuth);
+
+function tryAuth() {
+  const val = document.getElementById('authInput').value.trim();
+  if (val === ELFES_PASSWORD) {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    initFirebase();
+  } else {
+    document.getElementById('authErr').textContent = '❌ Mot de passe incorrect.';
+  }
+}
+
+/* Check URL param ?elfes=PASSWORD for direct access */
+(function() {
+  const p = new URLSearchParams(location.search).get('elfes');
+  if (p === ELFES_PASSWORD) {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    initFirebase();
+  }
+})();
+
+/* ════ Firebase ════ */
+function initFirebase() {
+  if (FIREBASE_CONFIG.apiKey === 'REMPLACE_MOI') {
+    document.getElementById('connTxt').textContent = 'Firebase non configuré — remplissez FIREBASE_CONFIG dans elfes.html';
+    return;
+  }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+
+    db.ref('.info/connected').on('value', snap => {
+      const on = snap.val() === true;
+      document.getElementById('connDot').className = 'status-dot ' + (on ? 'dot-on' : 'dot-off');
+      document.getElementById('connTxt').textContent = on ? 'Connecté à Firebase ✓' : 'Connexion perdue…';
+    });
+
+    db.ref('rooms').on('value', snap => {
+      roomsData = snap.val() || {};
+      renderRooms();
+    });
+
+    db.ref('progress').on('value', snap => {
+      progressData = snap.val() || {};
+      renderTeams();
+    });
+  } catch (e) {
+    document.getElementById('connTxt').textContent = 'Erreur Firebase : ' + e.message;
+  }
+}
+
+/* ════ Render rooms ════ */
+function renderRooms() {
+  const grid = document.getElementById('roomGrid');
+  grid.innerHTML = '';
+  ROOMS.forEach(room => {
+    const lock = roomsData[room.id];
+    const card = document.createElement('div');
+    card.className = 'room-card';
+
+    let statusHtml = '<span class="room-status status-free">🟢 Libre</span>';
+    let sinceHtml  = '';
+    let unlockBtn  = '';
+
+    if (lock?.lockedBy) {
+      const teamName = lock.lockedByName || ('Équipe ' + lock.lockedBy);
+      statusHtml = `<span class="room-status status-locked">🔒 ${teamName}</span>`;
+      if (lock.lockedAt) {
+        const elapsed = Math.round((Date.now() - lock.lockedAt) / 60000);
+        const remaining = 15 - elapsed;
+        sinceHtml = `<span class="room-since">depuis ${elapsed} min</span>`;
+        if (remaining > 0)
+          sinceHtml += ` <span class="room-timeout">(libération auto dans ${remaining} min)</span>`;
+        else
+          sinceHtml += ` <span class="room-timeout" style="color:#e05050">(expirée !)</span>`;
+      }
+      unlockBtn = `<button class="btn-unlock" onclick="unlockRoom('${room.id}')">🔓 Libérer</button>`;
+    }
+
+    card.innerHTML = `
+      <div class="room-name">${room.label}</div>
+      <div>${statusHtml}${sinceHtml ? '<br>' + sinceHtml : ''}</div>
+      ${unlockBtn}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+/* ════ Render team progress ════ */
+function renderTeams() {
+  const grid = document.getElementById('teamsGrid');
+  grid.innerHTML = '';
+  [1, 2, 3].forEach(id => {
+    const card = document.createElement('div');
+    card.className = 'team-card';
+    const teamProgress = progressData[id] || {};
+    const done = TOOLS.filter(t => teamProgress[t.key]).length;
+    let toolHtml = TOOLS.map(t =>
+      `<div class="${teamProgress[t.key] ? 'tool-done' : 'tool-miss'}">${teamProgress[t.key] ? '✓' : '○'} ${t.label}</div>`
+    ).join('');
+    card.innerHTML = `<div class="team-name">${TEAM_NAMES[id]} — ${done}/${TOOLS.length}</div><div class="tool-list">${toolHtml}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+/* ════ Actions ════ */
+function unlockRoom(roomId) {
+  if (!db) return;
+  db.ref('rooms/' + roomId).set(null)
+    .then(() => log('✅ Pièce ' + roomId + ' libérée.'))
+    .catch(e => log('❌ Erreur : ' + e.message));
+}
+
+function showResetConfirm()  { document.getElementById('resetConfirm').style.display = 'block'; }
+function hideResetConfirm()  { document.getElementById('resetConfirm').style.display = 'none';  }
+
+function doReset() {
+  if (!db) return;
+  hideResetConfirm();
+  db.ref('rooms').set(null)
+    .then(() => { log('🗑️ Tous les verrous effacés.'); })
+    .catch(e => log('❌ Erreur : ' + e.message));
+}
+
+function log(msg) {
+  document.getElementById('log').textContent = msg;
+  setTimeout(() => { document.getElementById('log').textContent = ''; }, 5000);
+}
+</script>
+</body>
+</html>

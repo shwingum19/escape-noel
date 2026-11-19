@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset — Escape Game Noël</title>
+  <style>
+    body {
+      margin: 0; padding: 40px 20px;
+      background: #131020;
+      color: #f0dca8;
+      font-family: monospace;
+      text-align: center;
+    }
+    h1 { color: #d89830; font-size: 20px; margin-bottom: 24px; }
+    .btn {
+      display: block;
+      width: 100%; max-width: 320px;
+      margin: 10px auto;
+      padding: 12px 20px;
+      background: #5A3A28;
+      border: 3px solid #3c1c08;
+      color: #f0dca8;
+      font-family: monospace;
+      font-size: 15px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+    }
+    .btn:hover { background: #7a3c14; }
+    .btn-danger { border-color: #c03828; }
+    .btn-green  { background: #2a5020; border-color: #4a9040; }
+    .btn-green:hover { background: #3a7030; }
+    #log {
+      margin-top: 24px;
+      font-size: 13px;
+      color: #b89060;
+      line-height: 1.8;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: left;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧 Reset — Escape Game Noël</h1>
+
+  <h2 style="color:#e8c040;font-size:15px;margin:0 0 6px;">🧪 Test complet (outils déverrouillés, non résolus)</h2>
+  <button class="btn btn-green" onclick="setupTest(1)">🧪 Test complet — Équipe 1</button>
+  <button class="btn btn-green" onclick="setupTest(2)">🧪 Test complet — Équipe 2</button>
+  <button class="btn btn-green" onclick="setupTest(3)">🧪 Test complet — Équipe 3</button>
+
+  <h2 style="color:#b89060;font-size:15px;margin:16px 0 6px;">↩ Remise à zéro</h2>
+  <button class="btn btn-danger" onclick="resetAll()">🗑️ Tout effacer (toutes équipes)</button>
+  <button class="btn" onclick="resetTeam(1)">↩ Reset Équipe 1 seulement</button>
+  <button class="btn" onclick="resetTeam(2)">↩ Reset Équipe 2 seulement</button>
+  <button class="btn" onclick="resetTeam(3)">↩ Reset Équipe 3 seulement</button>
+
+  <h2 style="color:#b89060;font-size:15px;margin:16px 0 6px;">▶ Ouvrir le jeu</h2>
+  <a class="btn" href="index.html?equipe=1">▶ Ouvrir jeu équipe 1</a>
+  <a class="btn" href="index.html?equipe=2">▶ Ouvrir jeu équipe 2</a>
+  <a class="btn" href="index.html?equipe=3">▶ Ouvrir jeu équipe 3</a>
+
+  <div id="log"></div>
+
+  <script>
+    const KEYS = id => [
+      'esc_noel_success_' + id,
+      'esc_noel_unlock_radio_' + id,
+      'esc_noel_unlock_recettes_' + id,
+      'esc_noel_unlock_carnet_' + id,
+      'esc_noel_radio_clue_' + id,
+      'esc_noel_puzzle_recettes_' + id,
+      'esc_noel_unlock_carillon_' + id,
+      'esc_noel_carillon_solved_' + id,
+      'esc_noel_unlock_bougie_' + id,
+      'esc_noel_bougie_solved_' + id,
+      'esc_noel_bougie_progress_' + id,
+      'esc_noel_unlock_foret_' + id,
+      'esc_noel_foret_solved_' + id,
+      'esc_noel_unlock_traducteur_' + id,
+      'esc_noel_traducteur_solved_' + id,
+      'esc_noel_traducteur_map_' + id,
+      'esc_noel_traducteur_enter_' + id,
+      'esc_noel_traducteur_hint_' + id,
+      'esc_noel_recettes_order_'    + id,
+      'esc_noel_recettes_progress_' + id,
+      'esc_noel_carnet_' + id,
+    ];
+    const GLOBAL_KEYS = ['esc_noel_team'];
+
+    function log(msg) {
+      document.getElementById('log').textContent += msg + '\n';
+    }
+
+    const UNLOCK_KEYS = id => [
+      'esc_noel_unlock_radio_'     + id,
+      'esc_noel_unlock_recettes_'  + id,
+      'esc_noel_unlock_carillon_'  + id,
+      'esc_noel_unlock_bougie_'    + id,
+      'esc_noel_unlock_foret_'       + id,
+      'esc_noel_unlock_traducteur_' + id,
+      'esc_noel_unlock_carnet_'     + id,
+    ];
+
+    function setupTest(id) {
+      document.getElementById('log').textContent = '';
+      /* 1. Reset complet de l'équipe */
+      KEYS(id).forEach(k => localStorage.removeItem(k));
+      /* 2. Déverrouiller tous les outils */
+      UNLOCK_KEYS(id).forEach(k => {
+        localStorage.setItem(k, '1');
+        log('🔓 Déverrouillé : ' + k);
+      });
+      log('— Équipe ' + id + ' prête pour test. Ouverture…');
+      setTimeout(() => { window.location.href = 'index.html?equipe=' + id; }, 600);
+    }
+
+    function resetTeam(id) {
+      document.getElementById('log').textContent = '';
+      KEYS(id).forEach(k => {
+        const had = localStorage.getItem(k) !== null;
+        localStorage.removeItem(k);
+        if (had) log('✅ Supprimé : ' + k);
+      });
+      log('— Équipe ' + id + ' réinitialisée.');
+    }
+
+    function resetAll() {
+      document.getElementById('log').textContent = '';
+      [1, 2, 3].forEach(id => KEYS(id).forEach(k => {
+        const had = localStorage.getItem(k) !== null;
+        localStorage.removeItem(k);
+        if (had) log('✅ Supprimé : ' + k);
+      }));
+      GLOBAL_KEYS.forEach(k => {
+        const had = localStorage.getItem(k) !== null;
+        localStorage.removeItem(k);
+        if (had) log('✅ Supprimé : ' + k);
+      });
+      log('— Tout réinitialisé.');
+    }
+
+    /* Afficher l'état actuel au chargement */
+    window.onload = () => {
+      log('État actuel localStorage :');
+      let found = false;
+      [1,2,3].forEach(id => KEYS(id).forEach(k => {
+        const v = localStorage.getItem(k);
+        if (v !== null) { log('  ' + k + ' = ' + v); found = true; }
+      }));
+      GLOBAL_KEYS.forEach(k => {
+        const v = localStorage.getItem(k);
+        if (v !== null) { log('  ' + k + ' = ' + v); found = true; }
+      });
+      if (!found) log('  (vide)');
+    };
+  </script>
+</body>
+</html>
