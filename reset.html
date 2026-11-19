@@ -66,30 +66,34 @@
   <div id="log"></div>
 
   <script>
-    const KEYS = id => [
-      'esc_noel_success_' + id,
-      'esc_noel_unlock_radio_' + id,
-      'esc_noel_unlock_recettes_' + id,
-      'esc_noel_unlock_carnet_' + id,
-      'esc_noel_radio_clue_' + id,
-      'esc_noel_puzzle_recettes_' + id,
-      'esc_noel_unlock_carillon_' + id,
-      'esc_noel_carillon_solved_' + id,
-      'esc_noel_unlock_bougie_' + id,
-      'esc_noel_bougie_solved_' + id,
-      'esc_noel_bougie_progress_' + id,
-      'esc_noel_unlock_foret_' + id,
-      'esc_noel_foret_solved_' + id,
+    /* Scan dynamique : efface tout ce qui commence par esc_noel_ */
+    function getKeysForTeam(id) {
+      const suffix = '_' + id;
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('esc_noel_') && k.endsWith(suffix)) keys.push(k);
+      }
+      return keys;
+    }
+    function getGlobalKeys() {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('esc_noel_') && !/_\d+$/.test(k)) keys.push(k);
+      }
+      return keys;
+    }
+
+    const UNLOCK_KEYS = id => [
+      'esc_noel_unlock_radio_'     + id,
+      'esc_noel_unlock_recettes_'  + id,
+      'esc_noel_unlock_carillon_'  + id,
+      'esc_noel_unlock_bougie_'    + id,
+      'esc_noel_unlock_foret_'     + id,
       'esc_noel_unlock_traducteur_' + id,
-      'esc_noel_traducteur_solved_' + id,
-      'esc_noel_traducteur_map_' + id,
-      'esc_noel_traducteur_enter_' + id,
-      'esc_noel_traducteur_hint_' + id,
-      'esc_noel_recettes_order_'    + id,
-      'esc_noel_recettes_progress_' + id,
-      'esc_noel_carnet_' + id,
+      'esc_noel_unlock_carnet_'    + id,
     ];
-    const GLOBAL_KEYS = ['esc_noel_team'];
 
     function log(msg) {
       document.getElementById('log').textContent += msg + '\n';
@@ -120,42 +124,34 @@
 
     function resetTeam(id) {
       document.getElementById('log').textContent = '';
-      KEYS(id).forEach(k => {
-        const had = localStorage.getItem(k) !== null;
-        localStorage.removeItem(k);
-        if (had) log('✅ Supprimé : ' + k);
-      });
-      log('— Équipe ' + id + ' réinitialisée.');
+      const keys = getKeysForTeam(id);
+      if (keys.length === 0) { log('— Équipe ' + id + ' : déjà vide.'); return; }
+      keys.forEach(k => { localStorage.removeItem(k); log('✅ Supprimé : ' + k); });
+      log('— Équipe ' + id + ' réinitialisée (' + keys.length + ' clés effacées).');
     }
 
     function resetAll() {
       document.getElementById('log').textContent = '';
-      [1, 2, 3].forEach(id => KEYS(id).forEach(k => {
-        const had = localStorage.getItem(k) !== null;
-        localStorage.removeItem(k);
-        if (had) log('✅ Supprimé : ' + k);
-      }));
-      GLOBAL_KEYS.forEach(k => {
-        const had = localStorage.getItem(k) !== null;
-        localStorage.removeItem(k);
-        if (had) log('✅ Supprimé : ' + k);
+      let total = 0;
+      [1, 2, 3].forEach(id => {
+        getKeysForTeam(id).forEach(k => { localStorage.removeItem(k); log('✅ ' + k); total++; });
       });
-      log('— Tout réinitialisé.');
+      getGlobalKeys().forEach(k => { localStorage.removeItem(k); log('✅ ' + k); total++; });
+      log('— Tout réinitialisé (' + total + ' clés effacées).');
     }
 
     /* Afficher l'état actuel au chargement */
     window.onload = () => {
       log('État actuel localStorage :');
       let found = false;
-      [1,2,3].forEach(id => KEYS(id).forEach(k => {
-        const v = localStorage.getItem(k);
-        if (v !== null) { log('  ' + k + ' = ' + v); found = true; }
-      }));
-      GLOBAL_KEYS.forEach(k => {
-        const v = localStorage.getItem(k);
-        if (v !== null) { log('  ' + k + ' = ' + v); found = true; }
-      });
-      if (!found) log('  (vide)');
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('esc_noel_')) {
+          log('  ' + k + ' = ' + localStorage.getItem(k));
+          found = true;
+        }
+      }
+      if (!found) log('  (vide — tout est réinitialisé ✓)');
     };
   </script>
 </body>
