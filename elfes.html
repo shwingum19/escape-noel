@@ -268,8 +268,11 @@ function hideResetConfirm()  { document.getElementById('resetConfirm').style.dis
 function doReset() {
   if (!db) return;
   hideResetConfirm();
-  db.ref('rooms').set(null)
-    .then(() => { log('🗑️ Tous les verrous effacés.'); })
+  Promise.all([
+    db.ref('rooms').set(null),
+    db.ref('progress').set(null),
+  ])
+    .then(() => { log('🗑️ Verrous et progressions Firebase effacés.'); })
     .catch(e => log('❌ Erreur : ' + e.message));
 }
 
