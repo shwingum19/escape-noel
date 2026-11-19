@@ -271,8 +271,9 @@ function doReset() {
   Promise.all([
     db.ref('rooms').set(null),
     db.ref('progress').set(null),
+    db.ref('carnet').set(null),
   ])
-    .then(() => { log('🗑️ Verrous et progressions Firebase effacés.'); })
+    .then(() => { log('🗑️ Verrous, progressions et carnets Firebase effacés.'); })
     .catch(e => log('❌ Erreur : ' + e.message));
 }
 

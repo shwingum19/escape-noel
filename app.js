@@ -218,8 +218,8 @@ const CONFIG = {
       { freq:  96.7, name: 'Hiver FM',           synth: { type: 'sine',     freq: 330 }, isReal: false },
       { freq:  99.1, name: '📡 Station Secrète', synth: { type: 'sine',     freq: 523 }, isReal: true,
         clue: {
-          title: 'Message radio intercepté',
-          text: '…ici la Station Secrète du Pôle Nord…\nle Père Noël a rangé la clé\nsous le sapin du salon…\n…répète : sous le sapin du salon…'
+          title: 'Station Secrète des Elfes',
+          text: '…Bienvenue sur la Station Secrète des Elfes…\nEn captant cette fréquence, vous avez\ndébloqué des informations supplémentaires !\nConsultez votre carnet — un avantage\npour la suite de votre aventure vous y attend…'
         }
       },
       { freq: 102.4, name: 'Flocons Radio',      synth: { type: 'sawtooth', freq: 262 }, isReal: false },
@@ -1528,8 +1528,7 @@ function init() {
       const savedTeam = parseInt(localStorage.getItem('esc_noel_team'), 10);
       if (CONFIG.teams[savedTeam]) state.teamId = savedTeam;
     } catch (_) {}
-    initFirebase();
-    handleTagScan(tag);
+    initFirebase(() => handleTagScan(tag));
     return;
   }
 
@@ -2183,9 +2182,9 @@ function _triggerPuzzleError(pz) {
    FIREBASE — Verrous de pièces multi-équipes
 ============================================================ */
 
-function initFirebase() {
-  if (FIREBASE_CONFIG.apiKey === 'REMPLACE_MOI') return;
-  if (state.testMode) return; // pas de Firebase en mode test
+function initFirebase(onReady) {
+  if (FIREBASE_CONFIG.apiKey === 'REMPLACE_MOI') { if (onReady) onReady(); return; }
+  if (state.testMode) { if (onReady) onReady(); return; }
   try {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     fbState.db = firebase.database();
@@ -2203,8 +2202,11 @@ function initFirebase() {
 
     /* Écoute de la progression et du carnet de l'équipe */
     if (state.teamId) {
+      let _readyCalled = false;
+      const _callReady = () => { if (!_readyCalled && onReady) { _readyCalled = true; onReady(); } };
       fbState.db.ref('progress/' + state.teamId).on('value', snap => {
         fbState.progress = snap.val() || {};
+        _callReady();
         if (!state.testMode && fbState.progress['game_won'] === true) {
           showScreen('screen-menu');
           buildMenu(false);
@@ -2217,12 +2219,17 @@ function initFirebase() {
         fbState.carnet = Object.values(data);
         if ($('carnetEntries')) renderCarnet();
       });
+      /* Fallback si Firebase lent (3 s) */
+      setTimeout(_callReady, 3000);
+    } else {
+      if (onReady) onReady();
     }
 
     /* Vérification timeout toutes les minutes */
     setInterval(_checkLockTimeouts, 60000);
   } catch (e) {
     console.warn('[Firebase] init error', e);
+    if (onReady) onReady();
   }
 }
 
@@ -4077,7 +4084,9 @@ function renderCarnet() {
     card.appendChild(text);
 
     /* Message de récompense + code bon depuis CONFIG */
-    const _toolCfg = (entry.type === 'recettes') ? CONFIG.puzzles?.['recettes'] : CONFIG[entry.type];
+    const _toolCfg = (entry.type === 'puzzle' && entry.puzzleId)
+      ? CONFIG.puzzles?.[entry.puzzleId]
+      : CONFIG[entry.type];
     if (_toolCfg?.rewardMsg) {
       const reward = document.createElement('div');
       reward.className   = 'carnet-entry-reward';
