@@ -62,7 +62,7 @@ const CONFIG = {
 
     /* ── Équipe 2 ── */
     2: {
-      name: 'Équipe des Elfes',
+      name: 'Équipe des Étoiles',
       order: [3, 5, 1, 4, 0, 2],
       // Ordre : Bleue → Violette → Verte → Blanche → Rouge → Dorée
       victory: {
