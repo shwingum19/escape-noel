@@ -997,6 +997,7 @@ function unlockTool(key) {
     try { fbState.db.ref('progress/' + state.teamId + '/' + key).set(true); } catch (_) {}
   }
   if (fbState.mission?.tool === key) _endMission(true);
+  if (key === 'carnet' && fbState.mission) _endMission(true);
 }
 
 function buildMenu(withConfetti) {
@@ -3198,6 +3199,7 @@ function _renderConstellationState() {
 function _triggerBougieSolved(teamId) {
   const cfg   = CONFIG.bougie;
   const entry = cfg.carnetEntry;
+  unlockTool('carnet');
   try {
     const key    = 'esc_noel_carnet_' + teamId;
     const carnet = JSON.parse(localStorage.getItem(key) || '[]');
