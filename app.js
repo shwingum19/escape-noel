@@ -925,6 +925,7 @@ function stopTimer() {
 function startGame() {
   state.currentStep = 0;
   state.litLeds.clear();
+  try { localStorage.setItem('esc_noel_team', String(state.teamId)); } catch (_) {}
 
   buildLeds();
   updateProgress(0, state.teamCfg.order.length);
@@ -957,12 +958,10 @@ async function endSuccess() {
   /* Allumer toutes les LED */
   CONFIG.leds.forEach((_, i) => lightLed(i));
 
-  /* Mémoriser la réussite et l'équipe (sauf en mode test) */
+  /* Mémoriser la réussite (sauf en mode test) */
   if (!state.testMode) {
-    try {
-      localStorage.setItem('esc_noel_success_' + state.teamId, '1');
-      localStorage.setItem('esc_noel_team', String(state.teamId));
-    } catch (_) {}
+    _fbWriteProgress('game_won');
+    try { localStorage.setItem('esc_noel_team', String(state.teamId)); } catch (_) {}
   }
 
   showScreen('screen-menu');
@@ -1581,17 +1580,7 @@ function init() {
     startGame();
   });
 
-  /* Restauration depuis localStorage (désactivé en mode test) */
-  if (!state.testMode) {
-    try {
-      if (localStorage.getItem('esc_noel_success_' + teamId) === '1') {
-        showScreen('screen-menu');
-        buildMenu(false); /* pas de confettis au rechargement */
-        return;
-      }
-    } catch (_) {}
-  }
-
+  /* Toujours montrer la guirlande — le listener Firebase gérera le skip si déjà gagné */
   showScreen('screen-welcome');
 }
 
@@ -2216,7 +2205,12 @@ function initFirebase() {
     if (state.teamId) {
       fbState.db.ref('progress/' + state.teamId).on('value', snap => {
         fbState.progress = snap.val() || {};
-        if ($('menuGrid')) buildMenu(false);
+        if (!state.testMode && fbState.progress['game_won'] === true) {
+          showScreen('screen-menu');
+          buildMenu(false);
+        } else if ($('menuGrid')) {
+          buildMenu(false);
+        }
       });
       fbState.db.ref('carnet/' + state.teamId).on('value', snap => {
         const data = snap.val() || {};
