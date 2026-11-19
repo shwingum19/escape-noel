@@ -158,7 +158,7 @@ const CONFIG = {
       {
         id:     'carnet',
         label:  'Carnet',
-        unlock: 'carnet',
+        unlock: null,
         action: 'openCarnet',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges"><rect x="4" y="2" width="14" height="20" fill="#5E8C5A"/><rect x="5" y="3" width="12" height="18" fill="#4F7D4E"/><rect x="6" y="4" width="10" height="14" fill="#F6F2EA"/><rect x="7" y="7" width="8" height="1" fill="#C8B890"/><rect x="7" y="10" width="8" height="1" fill="#C8B890"/><rect x="7" y="13" width="8" height="1" fill="#C8B890"/><rect x="7" y="16" width="5" height="1" fill="#C8B890"/><rect x="4" y="2" width="2" height="20" fill="#3A5C38"/><rect x="4" y="5" width="2" height="1" fill="#E8B04B"/><rect x="4" y="11" width="2" height="1" fill="#E8B04B"/><rect x="4" y="17" width="2" height="1" fill="#E8B04B"/></svg>',
       },
