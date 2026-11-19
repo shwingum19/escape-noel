@@ -1516,6 +1516,7 @@ function init() {
   const tag = params.get('tag');
   if (tag) {
     initSnow();
+    initFirebase();
     handleTagScan(tag);
     return;
   }
