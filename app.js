@@ -1524,6 +1524,22 @@ function init() {
   const raw    = parseInt(params.get('equipe'), 10);
   const teamId = CONFIG.teams[raw] ? raw : 1;
 
+  /* ── Réinitialisation forcée : ?reset=1 ── */
+  if (params.get('reset') === '1') {
+    const prefix = 'esc_noel_';
+    const suffix = '_' + teamId;
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix) && k.endsWith(suffix)) toRemove.push(k);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+    /* Retirer le paramètre reset de l'URL sans recharger */
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete('reset');
+    window.history.replaceState({}, '', clean.toString());
+  }
+
   state.teamId   = teamId;
   state.teamCfg  = CONFIG.teams[teamId];
   state.testMode = params.get('test') === '1';
