@@ -350,7 +350,7 @@ const CONFIG = {
         img:  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" shape-rendering="crispEdges"><rect x="8" y="34" width="44" height="22" fill="#C83020"/><rect x="8" y="34" width="44" height="4" fill="#D04030"/><rect x="6" y="26" width="48" height="10" fill="#A82010"/><rect x="6" y="26" width="48" height="2" fill="#B83020"/><rect x="6" y="40" width="48" height="4" fill="#E8C040"/><rect x="27" y="26" width="6" height="30" fill="#E8C040"/><rect x="16" y="18" width="12" height="10" fill="#E8C040"/><rect x="18" y="20" width="8" height="6" fill="#D4A820"/><rect x="32" y="18" width="12" height="10" fill="#E8C040"/><rect x="34" y="20" width="8" height="6" fill="#D4A820"/><rect x="27" y="20" width="6" height="6" fill="#C49020"/><rect x="28" y="21" width="4" height="4" fill="#E8C040"/><rect x="10" y="30" width="6" height="2" fill="#D04040"/><rect x="50" y="36" width="2" height="18" fill="#801010"/></svg>',
       },
     ],
-    answer:      'FLOCON',
+    answer:      'FAMILLE',
     hintDelay:   180000,
     hintCooldown:120000,
     texts: {
@@ -3983,15 +3983,16 @@ function _tradSnow() {
   const container = $('trad-snowflakes');
   if (!container) return;
   container.innerHTML = '';
-  for (let i = 0; i < 25; i++) {
-    const flake = document.createElement('span');
-    flake.className = 'trad-snowflake';
-    flake.textContent = '❄';
-    flake.style.left = Math.random() * 100 + 'vw';
-    flake.style.animationDuration = (2 + Math.random() * 3) + 's';
-    flake.style.animationDelay = (Math.random() * 2) + 's';
-    flake.style.fontSize = (12 + Math.random() * 16) + 'px';
-    container.appendChild(flake);
+  const symbols = ['♥', '★', '♥', '★', '✦', '♥'];
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('span');
+    p.className = 'trad-particle';
+    p.textContent = symbols[i % symbols.length];
+    p.style.left = Math.random() * 100 + 'vw';
+    p.style.animationDuration = (1.5 + Math.random() * 2.5) + 's';
+    p.style.animationDelay = (Math.random() * 2) + 's';
+    p.style.fontSize = (10 + Math.random() * 14) + 'px';
+    container.appendChild(p);
   }
 }
 
