@@ -2320,8 +2320,11 @@ function initFirebase(onReady) {
             showScreen('screen-menu');
             buildMenu(false);
           } else if (firstLoad) {
-            /* Premier chargement : restaurer l'écran précédent si possible */
-            if (!_restoreScreen()) showScreen('screen-welcome');
+            /* Premier chargement : restaurer l'écran précédent si possible.
+               Si Firebase ne montre aucune progression (reset ou nouvelle partie),
+               on ignore le localStorage pour revenir à l'accueil. */
+            const hasProgress = Object.keys(fbState.progress).length > 0;
+            if (!hasProgress || !_restoreScreen()) showScreen('screen-welcome');
           } else if ($('screen-menu')?.classList.contains('active')) {
             /* Mise à jour en temps réel : rafraîchir le menu seulement s'il est affiché */
             buildMenu(false);
