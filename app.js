@@ -301,12 +301,20 @@ const CONFIG = {
 
   /* ── Bougie des Elfes ── */
   bougie: {
-    unlockName: 'Bougie des Elfes',
-    unlock:     'bougie',
-    answers:    ['cloche', 'clochette', 'cloche de noel', 'grelot'],
-    retryDelay: 20,         // secondes de pause après mauvaise réponse
+    unlockName:     'Bougie des Elfes',
+    unlock:         'bougie',
+    answers:        ['cloche', 'clochette', 'cloche de noel', 'grelot'],
+    retryDelay:     20,          // secondes de pause après mauvaise réponse
+    hintDelayMs:    120000,      // 2 min avant le premier indice
+    hintIntervalMs: 120000,      // 2 min entre chaque indice suivant
+    hints: [
+      'Avez-vous remarqué une étoile un peu particulière dans cette pièce ?',
+      'Les étoiles ne brillent vraiment que quand la nuit tombe…',
+      'Et si vous appuyiez sur l\'étoile de l\'interrupteur ?',
+    ],
     texts: {
-      consigne: 'Les elfes ont dessiné une constellation dans cette pièce.\nÉteignez la lumière, laissez vos yeux s\'habituer au noir,\net cherchez bien autour de vous… Que représente-t-elle ?',
+      prep:     'Fermez bien la porte derrière vous.',
+      consigne: 'Les elfes ont dessiné une constellation dans cette pièce… Mais les étoiles sont timides : elles ne se montrent qu\'à ceux qui savent trouver la bonne étoile. Que représente la constellation ?',
       wrong:    'Ce n\'est pas ce que les étoiles dessinent…\nRegardez encore !',
       success:  'Bravo ! Avant de partir, rallumez la lumière\net remettez tout en place.',
     },
@@ -3070,7 +3078,7 @@ function _showMusicNotes() {
 ============================================================ */
 let bougieAnswerCooldown = false;
 let bougieCooldownTimer  = null;
-const bougieState = { initialized: false };
+const bougieState = { initialized: false, hintIndex: 0, hintTimer: null };
 
 /* Constellation en forme de cloche de Noël : positions (x,y) + paires de lignes */
 const BOUGIE_CSTARS = [
@@ -3139,19 +3147,19 @@ function _showBougiePuzzle() {
   $('bougie-prep').classList.add('hidden');
   $('bougie-puzzle').classList.remove('hidden');
   _renderBougieState();
+  if (fbState.progress['done_bougie'] !== true) _startBougieHintTimer();
 }
 
 function _buildBougiePrep(wrap) {
+  const cfg = CONFIG.bougie;
   wrap.innerHTML = `
     <div class="bougie-prep-title">🕯️ La Bougie des Elfes</div>
-    <div class="bougie-prep-subtitle">Préparez la pièce avant de commencer</div>
     <div class="bougie-prep-steps">
       <div class="bougie-prep-step">
-        <div class="bougie-prep-icon">${_lampoffSvg()}</div>
-        <div class="bougie-prep-step-text">Fermez la porte et éteignez toutes les lumières</div>
+        <div class="bougie-prep-step-text">${cfg.texts.prep}</div>
       </div>
     </div>
-    <button id="bougie-start-btn" class="bougie-start-btn bougie-start-btn-ready">C'est fait, on commence !</button>
+    <button id="bougie-start-btn" class="bougie-start-btn bougie-start-btn-ready">On commence !</button>
   `;
   wrap.querySelector('#bougie-start-btn').addEventListener('click', () => { ensureAudio(); _showBougiePuzzle(); });
 }
@@ -3173,17 +3181,61 @@ function _buildBougiePuzzle(wrap) {
     btn.addEventListener('click',   () => { ensureAudio(); _checkBougieAnswer(); });
   }
 
+  /* Hint button */
+  const hintBtn = $('bougie-hint-btn');
+  if (hintBtn && !hintBtn._bound) {
+    hintBtn._bound = true;
+    hintBtn.addEventListener('click', () => { ensureAudio(); _showNextBougieHint(); });
+  }
+
   if (state.testMode) {
     const tb = $('bougie-test-btns');
     if (tb) {
       tb.classList.remove('hidden');
       tb.innerHTML = '';
-      const b = document.createElement('button');
-      b.className = 'btn-test-small';
-      b.textContent = '🧪 Simuler bonne réponse';
-      b.addEventListener('click', () => { ensureAudio(); _triggerBougieSolved(); });
-      tb.appendChild(b);
+      const b1 = document.createElement('button');
+      b1.className = 'btn-test-small';
+      b1.textContent = '🧪 Simuler bonne réponse';
+      b1.addEventListener('click', () => { ensureAudio(); _triggerBougieSolved(); });
+      const b2 = document.createElement('button');
+      b2.className = 'btn-test-small';
+      b2.textContent = '🧪 Indice suivant';
+      b2.addEventListener('click', () => { ensureAudio(); _showNextBougieHint(); });
+      tb.append(b1, b2);
     }
+  }
+}
+
+function _startBougieHintTimer() {
+  _stopBougieHintTimer();
+  const cfg = CONFIG.bougie;
+  if (bougieState.hintIndex >= cfg.hints.length) return;
+  const delay = bougieState.hintIndex === 0 ? cfg.hintDelayMs : cfg.hintIntervalMs;
+  bougieState.hintTimer = setTimeout(() => {
+    bougieState.hintTimer = null;
+    const btn = $('bougie-hint-btn');
+    if (btn) btn.classList.remove('hidden');
+  }, delay);
+}
+
+function _showNextBougieHint() {
+  const cfg = CONFIG.bougie;
+  if (bougieState.hintIndex >= cfg.hints.length) return;
+  const hintText = $('bougie-hint-text');
+  const hintBtn  = $('bougie-hint-btn');
+  if (hintText) {
+    hintText.textContent = cfg.hints[bougieState.hintIndex];
+    hintText.classList.remove('hidden');
+  }
+  if (hintBtn) hintBtn.classList.add('hidden');
+  bougieState.hintIndex++;
+  _startBougieHintTimer();
+}
+
+function _stopBougieHintTimer() {
+  if (bougieState.hintTimer) {
+    clearTimeout(bougieState.hintTimer);
+    bougieState.hintTimer = null;
   }
 }
 
@@ -3301,6 +3353,7 @@ function _triggerBougieSolved() {
   const entry = cfg.carnetEntry;
   if (bougieCooldownTimer) { clearInterval(bougieCooldownTimer); bougieCooldownTimer = null; }
   bougieAnswerCooldown = false;
+  _stopBougieHintTimer();
   if (!state.testMode) {
     _fbWriteProgress('done_bougie');
     unlockTool('carnet');
@@ -3317,6 +3370,10 @@ function _showBougieSuccess() {
 
   if (inputArea) inputArea.classList.add('hidden');
   if (coolEl)    coolEl.classList.add('hidden');
+  const hintBtn  = $('bougie-hint-btn');
+  const hintText = $('bougie-hint-text');
+  if (hintBtn)  hintBtn.classList.add('hidden');
+  if (hintText) hintText.classList.add('hidden');
 
   /* Révéler la constellation en doré (cloche) */
   BOUGIE_CSTARS.forEach((_, i) => {

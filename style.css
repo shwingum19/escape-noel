@@ -2173,6 +2173,36 @@ html, body {
   background: rgba(200,160,40,0.12);
   border: 1px solid rgba(200,160,40,0.3);
 }
+.bougie-hint-btn {
+  display: block;
+  margin: 18px auto 0;
+  background: rgba(200,160,40,0.12);
+  border: 1px solid rgba(200,160,40,0.4);
+  color: #d8a830;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: background 0.2s;
+}
+.bougie-hint-btn:hover { background: rgba(200,160,40,0.22); }
+.bougie-hint-btn.hidden { display: none; }
+.bougie-hint-text {
+  margin: 14px auto 0;
+  max-width: 320px;
+  text-align: center;
+  color: #d8c080;
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.5;
+  padding: 10px 16px;
+  background: rgba(200,160,40,0.08);
+  border: 1px solid rgba(200,160,40,0.25);
+  border-radius: 4px;
+}
+.bougie-hint-text.hidden { display: none; }
 .bougie-test-wrap, .bougie-test-btns {
   display: flex;
   flex-wrap: wrap;
