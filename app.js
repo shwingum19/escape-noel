@@ -248,7 +248,6 @@ const CONFIG = {
       name:    'une lampe !',
       message: 'Objet détecté : une lampe !',
       tool:    'bougie',
-      warning: 'Attention : une seule équipe à la fois dans cette pièce.\nSi la pancarte indique « Équipe en cours », attendez votre tour ou explorez le reste de la maison.',
       icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" shape-rendering="crispEdges"><rect x="10" y="8" width="28" height="12" fill="#F0A840" opacity="0.6"/><rect x="20" y="4" width="8" height="2" fill="#5A9888"/><rect x="18" y="6" width="12" height="2" fill="#6BADA0"/><rect x="14" y="8" width="20" height="2" fill="#79BAA8"/><rect x="10" y="10" width="28" height="2" fill="#85C4B4"/><rect x="8" y="12" width="32" height="2" fill="#85C4B4"/><rect x="8" y="14" width="32" height="2" fill="#79BAA8"/><rect x="8" y="16" width="32" height="2" fill="#6BADA0"/><rect x="21" y="18" width="6" height="4" fill="#3A6058"/><rect x="16" y="22" width="16" height="2" fill="#3A9A88"/><rect x="13" y="24" width="22" height="2" fill="#3AA898"/><rect x="11" y="26" width="26" height="2" fill="#3AB0A0"/><rect x="10" y="28" width="28" height="4" fill="#3AB0A0"/><rect x="10" y="32" width="28" height="2" fill="#3AA898"/><rect x="11" y="34" width="26" height="2" fill="#3A9A88"/><rect x="13" y="36" width="22" height="2" fill="#3A8878"/><rect x="16" y="38" width="16" height="2" fill="#2A7868"/><rect x="14" y="24" width="2" height="14" fill="#28706A" opacity="0.5"/><rect x="20" y="23" width="2" height="16" fill="#28706A" opacity="0.4"/><rect x="26" y="23" width="2" height="16" fill="#28706A" opacity="0.4"/><rect x="32" y="24" width="2" height="14" fill="#28706A" opacity="0.5"/><rect x="13" y="40" width="22" height="2" fill="#287060"/><rect x="10" y="42" width="28" height="2" fill="#1A5048"/></svg>',
     },
     'salle-de-bain': {
@@ -294,18 +293,12 @@ const CONFIG = {
   bougie: {
     unlockName: 'Bougie des Elfes',
     unlock:     'bougie',
-    sequence:   [3, 1, 5, 2, 4],
-    starPositions: {
-      1: { cx: 120, cy: 22  },
-      2: { cx: 66,  cy: 90  },
-      3: { cx: 46,  cy: 160 },
-      4: { cx: 174, cy: 90  },
-      5: { cx: 194, cy: 160 },
-    },
+    answers:    ['sapin'],  // normalisé : sans article ni pluriel — à changer selon la forme dessinée
+    retryDelay: 20,         // secondes de pause après mauvaise réponse
     texts: {
-      consigne: 'Retrouvez les étoiles cachées dans la pièce\npour reconstituer la Constellation des Elfes.',
-      wrong:    'Les étoiles se sont éteintes…\nRecommencez depuis le début.',
-      success:  'Bravo ! Avant de partir, rallumez la lumière,\nremettez tout en place et retournez la pancarte\nsur « Pièce libre » pour les autres équipes.',
+      consigne: 'Les elfes ont dessiné une constellation dans cette pièce.\nÉteignez la lumière, laissez vos yeux s\'habituer au noir,\net cherchez bien autour de vous… Que représente-t-elle ?',
+      wrong:    'Ce n\'est pas ce que les étoiles dessinent…\nRegardez encore !',
+      success:  'Bravo ! Avant de partir, rallumez la lumière\net remettez tout en place.',
     },
     carnetEntry: {
       icon:  '🕯️',
@@ -994,7 +987,8 @@ function isToolUnlocked(key) {
 function unlockTool(key) {
   if (state.testMode) return;
   _fbWriteProgress(key);
-  if (fbState.mission?.tool === key) _endMission(true);
+  /* La pièce n'est libérée qu'après la réussite du puzzle, pas au scan du tag.
+     _endMission(true) est déclenché par unlockTool('carnet') dans chaque fonction de victoire. */
   if (key === 'carnet' && fbState.mission) _endMission(true);
 }
 
@@ -1391,8 +1385,6 @@ function handleTagScan(tag) {
     handleCarillonTag();
   } else if (tag === 'lampe') {
     handleBougieTag();
-  } else if (/^nuit-[1-5]$/.test(tag)) {
-    handleNuitTag(parseInt(tag.split('-')[1], 10));
   } else if (tag === 'champignon') {
     handleForetTag();
   } else if (tag === 'nain') {
@@ -2920,8 +2912,8 @@ function _showMusicNotes() {
 /* ============================================================
    BOUGIE DES ELFES
 ============================================================ */
-let _bougieLastScanWrong = false;
-let _bougieJustScanned   = false;
+let bougieAnswerCooldown = false;
+let bougieCooldownTimer  = null;
 const bougieState = { initialized: false };
 
 function handleBougieTag() {
@@ -2939,48 +2931,10 @@ function handleBougieTag() {
   }
 }
 
-function handleNuitTag(starNum) {
-  const teamId = state.teamId;
-  if (!isToolUnlocked(CONFIG.bougie.unlock)) {
-    showScreen('screen-tag-error');
-    $('tagErrorMsg').textContent = 'Il fait trop sombre…\nTrouvez d\'abord la lampe des elfes.';
-    return;
-  }
-
-  const progressKey = 'esc_noel_bougie_progress_' + teamId;
-  if (fbState.progress['done_bougie'] === true) {
-    showScreen('screen-menu');
-    buildMenu(false);
-    setTimeout(openBougie, 80);
-    return;
-  }
-
-  const seq = CONFIG.bougie.sequence;
-  let progress = [];
-  try { progress = JSON.parse(localStorage.getItem(progressKey) || '[]'); } catch (_) {}
-
-  const expected = seq[progress.length];
-  if (starNum === expected) {
-    progress.push(starNum);
-    localStorage.setItem(progressKey, JSON.stringify(progress));
-    if (progress.length === seq.length) {
-      _fbWriteProgress('done_bougie');
-      _triggerBougieSolved(teamId);
-    }
-    _bougieLastScanWrong = false;
-  } else {
-    localStorage.removeItem(progressKey);
-    _bougieLastScanWrong = true;
-  }
-
-  _bougieJustScanned = true;
-  openBougie(true);
-}
-
-function openBougie(skipPrep) {
+function openBougie() {
   showScreen('screen-bougie');
   _initBougie();
-  if (skipPrep || fbState.progress['done_bougie'] === true) {
+  if (fbState.progress['done_bougie'] === true) {
     _showBougiePuzzle();
   } else {
     _showBougiePrep();
@@ -3011,52 +2965,22 @@ function _showBougiePrep() {
 function _showBougiePuzzle() {
   $('bougie-prep').classList.add('hidden');
   $('bougie-puzzle').classList.remove('hidden');
-  _renderConstellationState();
+  _renderBougieState();
 }
 
 function _buildBougiePrep(wrap) {
-  const cfg = CONFIG.bougie;
   wrap.innerHTML = `
     <div class="bougie-prep-title">🕯️ La Bougie des Elfes</div>
     <div class="bougie-prep-subtitle">Préparez la pièce avant de commencer</div>
     <div class="bougie-prep-steps">
       <div class="bougie-prep-step">
-        <div class="bougie-prep-icon">${_pancarteSvg()}</div>
-        <div class="bougie-prep-step-text">
-          <strong>Étape 1</strong> — Retournez la pancarte sur « Équipe en cours »
-          <label class="bougie-prep-check-label">
-            <input type="checkbox" id="bougie-check-pancarte" class="bougie-prep-checkbox">
-            <span class="bougie-prep-check-custom"></span>
-            C'est fait !
-          </label>
-        </div>
-      </div>
-      <div class="bougie-prep-step">
         <div class="bougie-prep-icon">${_lampoffSvg()}</div>
-        <div class="bougie-prep-step-text"><strong>Étape 2</strong> — Éteignez toutes les lumières de la pièce</div>
-      </div>
-      <div class="bougie-prep-step">
-        <div class="bougie-prep-icon">${_torchSvg()}</div>
-        <div class="bougie-prep-step-text"><strong>Étape 3</strong> — Prenez la lampe torche</div>
+        <div class="bougie-prep-step-text">Fermez la porte et éteignez toutes les lumières</div>
       </div>
     </div>
-    <button id="bougie-start-btn" class="bougie-start-btn" disabled>Commencer l'énigme</button>
+    <button id="bougie-start-btn" class="bougie-start-btn bougie-start-btn-ready">C'est fait, on commence !</button>
   `;
-
-  const cb  = wrap.querySelector('#bougie-check-pancarte');
-  const btn = wrap.querySelector('#bougie-start-btn');
-  cb.addEventListener('change', () => {
-    btn.disabled = !cb.checked;
-    btn.classList.toggle('bougie-start-btn-ready', cb.checked);
-  });
-  btn.addEventListener('click', () => { ensureAudio(); _showBougiePuzzle(); });
-
-  if (state.testMode) {
-    const testDiv = document.createElement('div');
-    testDiv.className = 'bougie-test-wrap';
-    testDiv.innerHTML = '<div class="bougie-test-title">🧪 Test — ordre : ' + cfg.sequence.join(', ') + '</div>';
-    wrap.appendChild(testDiv);
-  }
+  wrap.querySelector('#bougie-start-btn').addEventListener('click', () => { ensureAudio(); _showBougiePuzzle(); });
 }
 
 function _buildBougiePuzzle(wrap) {
@@ -3065,37 +2989,32 @@ function _buildBougiePuzzle(wrap) {
   if (instr) instr.textContent = cfg.texts.consigne;
 
   const svgWrap = $('bougie-svg-wrap');
-  if (svgWrap) svgWrap.innerHTML = _buildConstellationSvgStr();
+  if (svgWrap) svgWrap.innerHTML = _buildBougieStarsSvg();
+
+  /* input + bouton */
+  const inp = $('bougieInput');
+  const btn = $('bougieBtnValider');
+  if (inp && !inp._bound) {
+    inp._bound = true;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { ensureAudio(); _checkBougieAnswer(); } });
+    btn.addEventListener('click',   () => { ensureAudio(); _checkBougieAnswer(); });
+  }
 
   if (state.testMode) {
     const tb = $('bougie-test-btns');
     if (tb) {
       tb.classList.remove('hidden');
-      tb.innerHTML = '<div class="bougie-test-title">🧪 Test — simule les scans :</div>';
-      cfg.sequence.forEach((n, i) => {
-        const b = document.createElement('button');
-        b.className = 'btn-test-small';
-        b.textContent = 'Étoile ' + n + ' (' + (i + 1) + '/' + cfg.sequence.length + ')';
-        b.addEventListener('click', () => { ensureAudio(); handleNuitTag(n); });
-        tb.appendChild(b);
-      });
-      const reset = document.createElement('button');
-      reset.className = 'btn-test-small';
-      reset.textContent = '↺ Réinitialiser';
-      reset.addEventListener('click', () => {
-        localStorage.removeItem('esc_noel_bougie_progress_' + state.teamId);
-        localStorage.removeItem('esc_noel_bougie_solved_'   + state.teamId);
-        _bougieLastScanWrong = false;
-        _bougieJustScanned   = false;
-        _renderConstellationState();
-      });
-      tb.appendChild(reset);
+      tb.innerHTML = '';
+      const b = document.createElement('button');
+      b.className = 'btn-test-small';
+      b.textContent = '🧪 Simuler bonne réponse';
+      b.addEventListener('click', () => { ensureAudio(); _triggerBougieSolved(); });
+      tb.appendChild(b);
     }
   }
 }
 
-function _buildConstellationSvgStr() {
-  const cfg = CONFIG.bougie;
+function _buildBougieStarsSvg() {
   const bg = [
     [20,15],[55,8],[90,30],[145,12],[180,20],[210,35],[230,15],
     [10,55],[35,70],[80,65],[110,45],[155,55],[195,42],[220,60],
@@ -3103,124 +3022,139 @@ function _buildConstellationSvgStr() {
     [25,140],[60,155],[100,135],[140,148],[185,140],[225,130],
     [10,180],[50,190],[95,175],[135,185],[175,172],[210,185],[235,170],
   ];
+  /* Étoiles de la constellation (révélées en doré à la victoire) */
+  const cStars = [[60,40],[120,25],[180,55],[150,95],[90,110]];
+
   let str = '<svg id="bougieSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" shape-rendering="crispEdges">';
-  str += '<rect width="240" height="200" fill="#04060C"/>';
-  bg.forEach(([x, y]) => {
-    str += `<rect x="${x}" y="${y}" width="2" height="2" fill="#ffffff" opacity="${(0.15 + Math.random() * 0.25).toFixed(2)}"/>`;
+  str += '<rect width="240" height="200" fill="#02030A"/>';
+
+  bg.forEach(([x, y], i) => {
+    str += `<rect x="${x}" y="${y}" width="2" height="2" fill="#ffffff" opacity="${(0.1 + (i % 5) * 0.05).toFixed(2)}"/>`;
   });
 
-  const pos = cfg.starPositions;
-  const seq = cfg.sequence;
-
-  /* lignes reliant la séquence */
-  for (let i = 0; i < seq.length - 1; i++) {
-    const a = pos[seq[i]], b = pos[seq[i + 1]];
-    str += `<line id="bougie-line-${i}" x1="${a.cx + 5}" y1="${a.cy + 5}" x2="${b.cx + 5}" y2="${b.cy + 5}" stroke="#C8A040" stroke-width="1" opacity="0" stroke-dasharray="3 3"/>`;
+  /* Lignes de constellation (cachées) */
+  for (let i = 0; i < cStars.length - 1; i++) {
+    const [x1, y1] = cStars[i], [x2, y2] = cStars[i + 1];
+    str += `<line id="bougie-cline-${i}" x1="${x1+1}" y1="${y1+1}" x2="${x2+1}" y2="${y2+1}" stroke="#C8A040" stroke-width="1.5" opacity="0"/>`;
   }
-
-  /* étoiles */
-  for (let n = 1; n <= 5; n++) {
-    const { cx, cy } = pos[n];
-    str += _buildStarSvg(n, cx, cy);
-  }
+  /* Étoiles de constellation (cachées) */
+  cStars.forEach(([x, y], i) => {
+    str += `<rect id="bougie-cstar-${i}" x="${x-1}" y="${y-1}" width="4" height="4" fill="#FFE060" opacity="0"/>`;
+  });
 
   str += '</svg>';
   return str;
 }
 
-function _buildStarSvg(n, cx, cy) {
-  let s = `<g id="bougie-star-${n}" class="b-star" data-star="${n}" style="cursor:pointer">`;
-  s += `<rect x="${cx+2}" y="${cy}" width="6" height="2" fill="#808080"/>`;
-  s += `<rect x="${cx}" y="${cy+2}" width="10" height="2" fill="#808080"/>`;
-  s += `<rect x="${cx+2}" y="${cy+4}" width="6" height="2" fill="#808080"/>`;
-  s += `<rect x="${cx+4}" y="${cy-2}" width="2" height="2" fill="#808080"/>`;
-  s += `<rect x="${cx+4}" y="${cy+6}" width="2" height="2" fill="#808080"/>`;
-  for (let d = 0; d < n; d++) {
-    s += `<rect x="${cx+11+(d*4)}" y="${cy+1}" width="2" height="2" fill="#808080" class="b-dot-${n}"/>`;
+function _renderBougieState() {
+  const isSolved  = fbState.progress['done_bougie'] === true;
+  const inputArea = $('bougie-input-area');
+  const msgEl     = $('bougie-message');
+  const progEl    = $('bougie-progress');
+
+  if (isSolved) {
+    if (inputArea) inputArea.classList.add('hidden');
+    if (progEl) { progEl.textContent = '★ Constellation révélée !'; progEl.style.color = '#E8C040'; }
+    _showBougieSuccess();
+  } else {
+    if (inputArea) inputArea.classList.remove('hidden');
+    if (progEl) { progEl.textContent = ''; }
+    if (msgEl) msgEl.classList.add('hidden');
   }
-  s += '</g>';
-  return s;
 }
 
-function _renderConstellationState() {
-  const teamId     = state.teamId;
-  const solvedKey  = 'esc_noel_bougie_solved_'   + teamId;
-  const progressKey= 'esc_noel_bougie_progress_' + teamId;
-  const cfg        = CONFIG.bougie;
-  const seq        = cfg.sequence;
-
-  const isSolved = fbState.progress['done_bougie'] === true;
-  let progress   = [];
-  try { progress = JSON.parse(localStorage.getItem(progressKey) || '[]'); } catch (_) {}
-
-  const litStars = isSolved ? new Set(seq) : new Set(progress);
-
-  seq.forEach((n, i) => {
-    const starEl = document.getElementById('bougie-star-' + n);
-    if (!starEl) return;
-    const lit  = litStars.has(n);
-    const fill = lit ? '#E8C040' : '#808080';
-    starEl.querySelectorAll('rect').forEach(r => r.setAttribute('fill', fill));
-
-    const lineEl = document.getElementById('bougie-line-' + i);
-    if (lineEl && i < seq.length - 1) {
-      const nextLit = litStars.has(seq[i + 1]);
-      lineEl.setAttribute('opacity', (lit && nextLit) ? '0.7' : '0');
-    }
-  });
-
-  /* Progress counter */
-  const prog = $('bougie-progress');
-  if (prog) {
-    if (isSolved) {
-      prog.textContent = '★ Constellation complète !';
-      prog.style.color = '#E8C040';
-    } else {
-      prog.textContent = progress.length + ' / ' + seq.length + ' étoile' + (progress.length !== 1 ? 's' : '');
-      prog.style.color = '#a09070';
-    }
+function _checkBougieAnswer() {
+  if (bougieAnswerCooldown) return;
+  if (fbState.progress['done_bougie'] === true) return;
+  const cfg    = CONFIG.bougie;
+  const raw    = $('bougieInput')?.value || '';
+  if (!raw.trim()) return;
+  const normed = _normBougieAnswer(raw);
+  const ok     = cfg.answers.some(a => _normBougieAnswer(a) === normed);
+  if (ok) {
+    _triggerBougieSolved();
+  } else {
+    _bougieShowWrong();
   }
+}
 
-  /* Messages */
+function _normBougieAnswer(str) {
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim()
+    .replace(/^(un |une |le |la |les |du |des )/, '')
+    .replace(/s$/, '');
+}
+
+function _bougieShowWrong() {
+  const cfg   = CONFIG.bougie;
   const msgEl = $('bougie-message');
-  if (msgEl) {
-    if (isSolved) {
-      _showBougieSuccess();
-    } else if (_bougieLastScanWrong && _bougieJustScanned) {
-      msgEl.textContent = cfg.texts.wrong;
-      msgEl.className   = 'bougie-message bougie-msg-wrong';
-      msgEl.classList.remove('hidden');
-      _playBougieNote(false);
-    } else if (_bougieJustScanned && progress.length > 0) {
-      msgEl.classList.add('hidden');
-      _playBougieNote(true);
-    } else {
-      msgEl.classList.add('hidden');
-    }
-  }
+  const svgEl = document.getElementById('bougieSvg');
+  const inp   = $('bougieInput');
+  const btn   = $('bougieBtnValider');
+  const coolEl = $('bougie-cooldown');
 
-  _bougieJustScanned = false;
+  if (msgEl) {
+    msgEl.textContent = cfg.texts.wrong;
+    msgEl.className   = 'bougie-message bougie-msg-wrong';
+    msgEl.classList.remove('hidden');
+  }
+  if (svgEl) { svgEl.style.opacity = '0.08'; setTimeout(() => { if (svgEl) svgEl.style.opacity = '1'; }, 700); }
+  _playBougieNote(false);
+
+  bougieAnswerCooldown = true;
+  if (inp) { inp.disabled = true; inp.value = ''; }
+  if (btn) btn.disabled = true;
+
+  let remaining = cfg.retryDelay;
+  if (coolEl) { coolEl.textContent = `Réessayez dans ${remaining} s…`; coolEl.classList.remove('hidden'); }
+
+  bougieCooldownTimer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(bougieCooldownTimer);
+      bougieCooldownTimer  = null;
+      bougieAnswerCooldown = false;
+      if (inp) inp.disabled = false;
+      if (btn) btn.disabled = false;
+      if (coolEl) coolEl.classList.add('hidden');
+      if (msgEl)  msgEl.classList.add('hidden');
+    } else {
+      if (coolEl) coolEl.textContent = `Réessayez dans ${remaining} s…`;
+    }
+  }, 1000);
 }
 
-function _triggerBougieSolved(teamId) {
+function _triggerBougieSolved() {
   const cfg   = CONFIG.bougie;
   const entry = cfg.carnetEntry;
-  unlockTool('carnet');
-  _fbWriteCarnet('bougie', { type: 'bougie', icon: entry.icon, title: entry.title, text: entry.text });
+  if (bougieCooldownTimer) { clearInterval(bougieCooldownTimer); bougieCooldownTimer = null; }
+  bougieAnswerCooldown = false;
+  if (!state.testMode) {
+    _fbWriteProgress('done_bougie');
+    unlockTool('carnet');
+    _fbWriteCarnet('bougie', { type: 'bougie', icon: entry.icon, title: entry.title, text: entry.text });
+  }
+  _renderBougieState();
 }
 
 function _showBougieSuccess() {
   const cfg   = CONFIG.bougie;
-  const seq   = cfg.sequence;
   const msgEl = $('bougie-message');
+  const inputArea = $('bougie-input-area');
+  const coolEl    = $('bougie-cooldown');
 
-  seq.forEach(n => {
-    const starEl = document.getElementById('bougie-star-' + n);
-    if (starEl) starEl.querySelectorAll('rect').forEach(r => r.setAttribute('fill', '#FFE060'));
-  });
-  for (let i = 0; i < seq.length - 1; i++) {
-    const lineEl = document.getElementById('bougie-line-' + i);
-    if (lineEl) lineEl.setAttribute('opacity', '1');
+  if (inputArea) inputArea.classList.add('hidden');
+  if (coolEl)    coolEl.classList.add('hidden');
+
+  /* Révéler la constellation en doré */
+  for (let i = 0; i < 5; i++) {
+    const s = document.getElementById('bougie-cstar-' + i);
+    if (s) s.setAttribute('opacity', '1');
+  }
+  for (let i = 0; i < 4; i++) {
+    const l = document.getElementById('bougie-cline-' + i);
+    if (l) l.setAttribute('opacity', '0.9');
   }
 
   if (msgEl) {
@@ -3230,10 +3164,7 @@ function _showBougieSuccess() {
   }
 
   _playBougieSuccess();
-  if (!prefersReducedMotion()) {
-    _animateBougieShootingStar();
-    setTimeout(_animateBougieSuccessStars, 600);
-  }
+  if (!prefersReducedMotion()) setTimeout(_animateBougieSuccessStars, 400);
 }
 
 function _playBougieNote(correct) {
@@ -3265,27 +3196,6 @@ function _playBougieSuccess() {
   });
 }
 
-function _animateBougieShootingStar() {
-  const svg = document.getElementById('bougieSvg');
-  if (!svg) return;
-  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  dot.setAttribute('width', '3'); dot.setAttribute('height', '3');
-  dot.setAttribute('fill', '#FFE8A0');
-  svg.appendChild(dot);
-
-  const target = CONFIG.bougie.starPositions[CONFIG.bougie.sequence[0]];
-  let x = -10, y = -5;
-  const tx = target.cx + 5, ty = target.cy + 5;
-  const steps = 40;
-  let step = 0;
-  const id = setInterval(() => {
-    const t = step / steps;
-    dot.setAttribute('x', (x + (tx - x) * t).toFixed(1));
-    dot.setAttribute('y', (y + (ty - y) * t).toFixed(1));
-    step++;
-    if (step > steps) { clearInterval(id); dot.remove(); }
-  }, 25);
-}
 
 function _animateBougieSuccessStars() {
   const wrap = $('bougie-svg-wrap');

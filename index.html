@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 
@@ -558,6 +558,11 @@
       <div id="bougie-instructions" class="bougie-instructions"></div>
       <div id="bougie-svg-wrap" class="bougie-svg-wrap"></div>
       <div id="bougie-progress" class="bougie-progress-display"></div>
+      <div id="bougie-input-area" class="bougie-input-area hidden">
+        <input id="bougieInput" type="text" class="bougie-input" placeholder="Votre réponse…" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button id="bougieBtnValider" class="bougie-btn-valider">Valider</button>
+      </div>
+      <div id="bougie-cooldown" class="bougie-cooldown hidden"></div>
       <div id="bougie-message" class="bougie-message hidden"></div>
       <div id="bougie-test-btns" class="bougie-test-btns hidden"></div>
     </div>
@@ -622,6 +627,6 @@
   <!-- Firebase SDK (Realtime Database) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
