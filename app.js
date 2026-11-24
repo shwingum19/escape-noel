@@ -211,20 +211,30 @@ const CONFIG = {
     lockTolerance:       0.3,  // MHz : mouvement toléré avant de quitter la station
     realStationDelay:  1000,   // ms sur la vraie station pour déclencher l'indice
     mhzPerRotation:     8.0,   // MHz par tour complet du cadran (moins sensible)
+    radioAmbientSrc:  'assets/radio-voix.mp3', // remplacer par le vrai fichier son fourni
     stations: [
-      { freq:  88.5, name: 'Pôle Nord FM',      synth: { type: 'sine',     freq: 220 }, isReal: false },
-      { freq:  91.3, name: 'Elfes Radio',        synth: { type: 'sawtooth', freq: 165 }, isReal: false },
-      { freq:  94.0, name: 'Renne Express',      synth: { type: 'square',   freq: 196 }, isReal: false },
-      { freq:  96.7, name: 'Hiver FM',           synth: { type: 'sine',     freq: 330 }, isReal: false },
+      { freq:  88.5, name: 'Pôle Nord FM',      synth: { type: 'sine',     freq: 220 }, isReal: false,
+        broadcastText: 'Météo du Pôle Nord : ce soir, 40 centimètres de neige sur l\'atelier, et un vent glacial sur l\'écurie des rennes…' },
+      { freq:  91.3, name: 'Elfes Radio',        synth: { type: 'sawtooth', freq: 165 }, isReal: false,
+        broadcastText: 'Radio Lutins FM, la radio qui chante faux ! Et maintenant, notre grand tube : Vive le vent… d\'hiver…' },
+      { freq:  94.0, name: 'Renne Express',      synth: { type: 'square',   freq: 196 }, isReal: false,
+        broadcastText: 'Ici Rudolph, mon nez clignote, je répète, mon nez clignote…' },
+      { freq:  96.7, name: 'Hiver FM',           synth: { type: 'sine',     freq: 330 }, isReal: false,
+        broadcastText: 'Allô ? Quelqu\'un m\'entend ? Je crois que je suis enfermé dans le congélateur…' },
       { freq:  99.1, name: '📡 Station Secrète', synth: { type: 'sine',     freq: 523 }, isReal: true,
+        broadcastText: 'Ici la station secrète… Si vous êtes la famille Nzogue-Papin-DeParada-Gimenez, vous êtes au bon endroit. Les elfes ont quelque chose à vous donner. Le code à leur dire est : "Je suis debout". Bon courage, et bonnes fêtes ! Terminé.',
+        broadcastCode: 'Je suis debout',
         clue: {
           title: 'Station Secrète des Elfes',
-          text: '…Bienvenue sur la Station Secrète des Elfes…\nEn captant cette fréquence, vous avez\ndébloqué des informations supplémentaires !\nConsultez votre carnet — un avantage\npour la suite de votre aventure vous y attend…'
+          text:  'Vous avez découvert la station secrète ! Dites le code "Je suis debout" aux elfes.',
         }
       },
-      { freq: 102.4, name: 'Flocons Radio',      synth: { type: 'sawtooth', freq: 262 }, isReal: false },
-      { freq: 105.0, name: 'Nuit de Noël FM',    synth: { type: 'triangle', freq: 349 }, isReal: false },
-      { freq: 107.5, name: 'Elfe Variétés',      synth: { type: 'sine',     freq: 294 }, isReal: false },
+      { freq: 102.4, name: 'Flocons Radio',      synth: { type: 'sawtooth', freq: 262 }, isReal: false,
+        broadcastText: 'Les biscuits de la Mère Noël : croustillants dehors, fondants dedans ! En vente dans tous les ateliers.' },
+      { freq: 105.0, name: 'Nuit de Noël FM',    synth: { type: 'triangle', freq: 349 }, isReal: false,
+        broadcastText: 'Ici… zzz… allez chercher… zzz… dans la cave… zzz…' },
+      { freq: 107.5, name: 'Elfe Variétés',      synth: { type: 'sine',     freq: 294 }, isReal: false,
+        broadcastText: '— Suite à des turbulences sur le traîneau, le vol RENNE-24 est retardé. Les passagers sont priés de patienter en mangeant des biscuits.' },
     ],
     voucherCode: 'ANTENNE-2',
     rewardMsg:   'Seuls les mots peuvent résoudre certaines énigmes… En captant cette station, vous avez reçu le message des elfes, et une pièce de puzzle s\'est glissée entre les ondes. Allez vite l\'échanger au Comptoir des Elfes !',
@@ -769,6 +779,46 @@ async function typeWriter(el, text, speed = 32) {
     await new Promise(r => setTimeout(r, speed));
   }
   el.classList.remove('typing');
+}
+
+/* Typewriter avec un fragment mis en valeur (doré) */
+async function _typewriterHL(box, text, code, speed) {
+  const idx = code ? text.indexOf(code) : -1;
+  if (prefersReducedMotion()) {
+    if (idx === -1) {
+      box.textContent = text;
+    } else {
+      const sBefore = document.createElement('span'); sBefore.textContent = text.slice(0, idx);
+      const sCode   = document.createElement('span'); sCode.className = 'radio-broadcast-code'; sCode.textContent = code;
+      const sAfter  = document.createElement('span'); sAfter.textContent = text.slice(idx + code.length);
+      box.innerHTML = ''; box.append(sBefore, sCode, sAfter);
+    }
+    return;
+  }
+
+  box.innerHTML = '';
+  box.classList.add('typing');
+
+  async function typeInto(span, str) {
+    for (const ch of str) {
+      span.textContent += ch;
+      await new Promise(r => setTimeout(r, speed));
+    }
+  }
+
+  if (idx === -1) {
+    const s = document.createElement('span'); box.appendChild(s);
+    await typeInto(s, text);
+  } else {
+    const sBefore = document.createElement('span'); box.appendChild(sBefore);
+    await typeInto(sBefore, text.slice(0, idx));
+    const sCode = document.createElement('span'); sCode.className = 'radio-broadcast-code'; box.appendChild(sCode);
+    await typeInto(sCode, code);
+    const sAfter = document.createElement('span'); box.appendChild(sAfter);
+    await typeInto(sAfter, text.slice(idx + code.length));
+  }
+
+  box.classList.remove('typing');
 }
 
 /* ============================================================
@@ -1591,7 +1641,8 @@ const radioState = {
   snapAnim:         null,   // requestAnimationFrame pour l'animation aimant
 };
 
-let _radioAudio = null;
+let _radioAudio   = null;
+let _radioAmbient = null;
 
 function openRadio() {
   showScreen('screen-radio');
@@ -1617,6 +1668,7 @@ function openRadio() {
 
 function closeRadio() {
   stopRadioAudio();
+  if (_radioAmbient) { _radioAmbient.stop(); _radioAmbient = null; }
   clearTimeout(radioState.realStationTimer);
   radioState.realStationTimer = null;
   returnToMenu();
@@ -1673,6 +1725,45 @@ function stopRadioAudio() {
   try { _radioAudio.noiseSrc.stop(); } catch (_) {}
   try { _radioAudio.stationOsc.stop(); } catch (_) {}
   _radioAudio = null;
+}
+
+/* Son d'ambiance radio (voix brouillée synthétique) */
+function _startRadioAmbient() {
+  ensureAudio();
+  if (!state.soundEnabled || !state.audioCtx) return null;
+  const ctx = state.audioCtx;
+  const now = ctx.currentTime;
+
+  const buf = ctx.createBuffer(1, 2 * ctx.sampleRate, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.loop = true;
+
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 1.8;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.12, now);
+
+  /* LFO qui simule le rythme de la voix (~5.5 Hz) */
+  const lfo = ctx.createOscillator();
+  lfo.type = 'sine'; lfo.frequency.value = 5.5;
+  const lfoAmp = ctx.createGain();
+  lfoAmp.gain.value = 0.08;
+  lfo.connect(lfoAmp); lfoAmp.connect(gain.gain);
+
+  src.connect(bp); bp.connect(gain); gain.connect(ctx.destination);
+  src.start(); lfo.start();
+
+  return {
+    stop() {
+      const t = ctx.currentTime;
+      gain.gain.setTargetAtTime(0, t, 0.15);
+      setTimeout(() => { try { src.stop(); lfo.stop(); } catch(_) {} }, 400);
+    }
+  };
 }
 
 function updateRadioAudio(strength, station) {
@@ -1942,10 +2033,14 @@ function updateRadioFreqDisplay(freq) {
   const nameEl = $('radioStationName');
   if (nameEl) nameEl.textContent = station && strength > 0.4 ? station.name : '';
 
-  /* Vrai station : chrono de déclenchement de l'indice */
-  if (station?.isReal && strength > 0.85) {
+  /* Station : chrono de déclenchement du message (réelle ou leurre avec texte) */
+  const isBroadcast = station && strength > 0.85 && (station.isReal || station.broadcastText);
+  if (isBroadcast) {
     if (!radioState.realStationTimer) {
-      radioState.realStationTimer = setTimeout(() => triggerRealStation(station), CONFIG.radio.realStationDelay);
+      const handler = station.isReal
+        ? () => triggerRealStation(station)
+        : () => triggerLureStation(station);
+      radioState.realStationTimer = setTimeout(handler, CONFIG.radio.realStationDelay);
     }
   } else {
     clearTimeout(radioState.realStationTimer);
@@ -1977,10 +2072,10 @@ async function triggerRealStation(station) {
     _fbWriteCarnet('radio', { type: 'radio', title: station.clue.title, text: station.clue.text, freq: station.freq });
   }
 
-  /* Afficher les sous-titres */
-  await showStationSubtitles(station);
+  /* Afficher le message avec son d'ambiance */
+  await _showStationBroadcast(station);
 
-  /* Montrer le bouton Réécouter */
+  /* Montrer le bouton Relire */
   $('btnRadioReplay').classList.remove('hidden');
 
   /* Notification "indice enregistré" */
@@ -1992,19 +2087,35 @@ async function triggerRealStation(station) {
   }
 }
 
-async function showStationSubtitles(station) {
+function triggerLureStation(station) {
+  radioState.realStationTimer = null;
+  if (!station.broadcastText) return;
+  _showStationBroadcast(station);
+}
+
+async function _showStationBroadcast(station) {
   const box = $('radioSubtitleBox');
   if (!box) return;
+
+  if (_radioAmbient) { _radioAmbient.stop(); _radioAmbient = null; }
+
   box.classList.remove('hidden');
-  box.textContent = '';
-  await typeWriter(box, station.clue.text, 28);
+  box.innerHTML = '';
+
+  _radioAmbient = _startRadioAmbient();
+
+  const text = station.broadcastText || station.clue?.text || '';
+  const code = station.broadcastCode || null;
+  await _typewriterHL(box, text, code, 28);
+
+  if (_radioAmbient) { _radioAmbient.stop(); _radioAmbient = null; }
 }
 
 function replayRealStation() {
   const st = CONFIG.radio.stations.find(s => s.isReal);
   if (!st) return;
   showScreen('screen-radio');
-  showStationSubtitles(st);
+  _showStationBroadcast(st);
 }
 
 /* ============================================================
