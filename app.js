@@ -293,7 +293,7 @@ const CONFIG = {
   bougie: {
     unlockName: 'Bougie des Elfes',
     unlock:     'bougie',
-    answers:    ['sapin'],  // normalisé : sans article ni pluriel — à changer selon la forme dessinée
+    answers:    ['cloche', 'clochette', 'cloche de noel', 'grelot'],
     retryDelay: 20,         // secondes de pause après mauvaise réponse
     texts: {
       consigne: 'Les elfes ont dessiné une constellation dans cette pièce.\nÉteignez la lumière, laissez vos yeux s\'habituer au noir,\net cherchez bien autour de vous… Que représente-t-elle ?',
@@ -453,7 +453,8 @@ const fbState = {
   progress:  {},   // { toolKey: true, done_xxx: true, radio_clue: true, ... }
   carnet:    [],   // entrées du carnet (array)
 };
-let _fbFirstUpdate = true;
+let _fbFirstUpdate        = true;
+let _fbProgressInitialized = false;
 
 /* ============================================================
    UTILITAIRES DOM
@@ -463,6 +464,11 @@ const $ = id => document.getElementById(id);
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active');
+  /* Ne pas sauvegarder les écrans transitoires (accueil, erreur) */
+  const _dontPersist = new Set(['screen-welcome', 'screen-tag-error', 'screen-failure', 'screen-game']);
+  if (state.teamId && !_dontPersist.has(id)) {
+    try { localStorage.setItem('esc_noel_screen_' + state.teamId, id); } catch (_) {}
+  }
 }
 
 function prefersReducedMotion() {
@@ -2018,6 +2024,7 @@ function openPuzzle(puzzleId) {
 
   puzzleState.currentPuzzle = puzzleId;
   puzzleState.solved = false;
+  try { localStorage.setItem('esc_noel_puzzle_' + state.teamId, puzzleId); } catch (_) {}
 
   if (!state.testMode && fbState.progress['done_puzzle_' + puzzleId] === true) {
     puzzleState.solved = true;
@@ -2192,13 +2199,22 @@ function initFirebase(onReady) {
       let _readyCalled = false;
       const _callReady = () => { if (!_readyCalled && onReady) { _readyCalled = true; onReady(); } };
       fbState.db.ref('progress/' + state.teamId).on('value', snap => {
+        const firstLoad = !_fbProgressInitialized;
+        _fbProgressInitialized = true;
         fbState.progress = snap.val() || {};
         _callReady();
-        if (!state.testMode && fbState.progress['game_won'] === true) {
-          showScreen('screen-menu');
-          buildMenu(false);
-        } else if ($('menuGrid')) {
-          buildMenu(false);
+        if (!state.testMode) {
+          if (firstLoad && fbState.progress['game_won'] === true) {
+            /* Reprise après victoire (chargement initial) */
+            showScreen('screen-menu');
+            buildMenu(false);
+          } else if (firstLoad) {
+            /* Premier chargement : restaurer l'écran précédent si possible */
+            if (!_restoreScreen()) showScreen('screen-welcome');
+          } else if ($('screen-menu')?.classList.contains('active')) {
+            /* Mise à jour en temps réel : rafraîchir le menu seulement s'il est affiché */
+            buildMenu(false);
+          }
         }
       });
       fbState.db.ref('carnet/' + state.teamId).on('value', snap => {
@@ -2218,6 +2234,32 @@ function initFirebase(onReady) {
     console.warn('[Firebase] init error', e);
     if (onReady) onReady();
   }
+}
+
+function _restoreScreen() {
+  try {
+    const saved = localStorage.getItem('esc_noel_screen_' + state.teamId);
+    if (!saved) return false;
+    const map = {
+      'screen-menu':       () => { buildMenu(false); showScreen('screen-menu'); },
+      'screen-radio':      openRadio,
+      'screen-carillon':   openCarillon,
+      'screen-plan':       openPlan,
+      'screen-carnet':     openCarnet,
+      'screen-bougie':     openBougie,
+      'screen-foret':      openForet,
+      'screen-traducteur': openTraducteur,
+      'screen-puzzle':     () => {
+        const pid = localStorage.getItem('esc_noel_puzzle_' + state.teamId);
+        if (pid && CONFIG.puzzles?.[pid]) openPuzzle(pid);
+        else { buildMenu(false); showScreen('screen-menu'); }
+      },
+      'screen-recettes': openRecettes,
+    };
+    const fn = map[saved];
+    if (fn) { fn(); return true; }
+  } catch (_) {}
+  return false;
 }
 
 function _onRoomsUpdate(rooms) {
@@ -2916,6 +2958,23 @@ let bougieAnswerCooldown = false;
 let bougieCooldownTimer  = null;
 const bougieState = { initialized: false };
 
+/* Constellation en forme de cloche de Noël : positions (x,y) + paires de lignes */
+const BOUGIE_CSTARS = [
+  [120, 22],  // 0 — anneau du haut
+  [82,  65],  // 1 — épaule gauche
+  [158, 65],  // 2 — épaule droite
+  [52,  138], // 3 — corps bas-gauche
+  [188, 138], // 4 — corps bas-droit
+  [68,  154], // 5 — rebord gauche
+  [172, 154], // 6 — rebord droit
+];
+const BOUGIE_CLINES = [
+  [0,1],[0,2],  // anneau → épaules
+  [1,3],[2,4],  // épaules → corps
+  [3,5],[4,6],  // corps → rebord
+  [5,6],        // rebord horizontal
+];
+
 function handleBougieTag() {
   const cfg = CONFIG.bougie;
   if (isToolUnlocked(cfg.unlock)) {
@@ -3022,8 +3081,6 @@ function _buildBougieStarsSvg() {
     [25,140],[60,155],[100,135],[140,148],[185,140],[225,130],
     [10,180],[50,190],[95,175],[135,185],[175,172],[210,185],[235,170],
   ];
-  /* Étoiles de la constellation (révélées en doré à la victoire) */
-  const cStars = [[60,40],[120,25],[180,55],[150,95],[90,110]];
 
   let str = '<svg id="bougieSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" shape-rendering="crispEdges">';
   str += '<rect width="240" height="200" fill="#02030A"/>';
@@ -3032,14 +3089,14 @@ function _buildBougieStarsSvg() {
     str += `<rect x="${x}" y="${y}" width="2" height="2" fill="#ffffff" opacity="${(0.1 + (i % 5) * 0.05).toFixed(2)}"/>`;
   });
 
-  /* Lignes de constellation (cachées) */
-  for (let i = 0; i < cStars.length - 1; i++) {
-    const [x1, y1] = cStars[i], [x2, y2] = cStars[i + 1];
-    str += `<line id="bougie-cline-${i}" x1="${x1+1}" y1="${y1+1}" x2="${x2+1}" y2="${y2+1}" stroke="#C8A040" stroke-width="1.5" opacity="0"/>`;
-  }
-  /* Étoiles de constellation (cachées) */
-  cStars.forEach(([x, y], i) => {
-    str += `<rect id="bougie-cstar-${i}" x="${x-1}" y="${y-1}" width="4" height="4" fill="#FFE060" opacity="0"/>`;
+  /* Lignes de la constellation (cachées jusqu'à la victoire) */
+  BOUGIE_CLINES.forEach(([a, b], i) => {
+    const [x1, y1] = BOUGIE_CSTARS[a], [x2, y2] = BOUGIE_CSTARS[b];
+    str += `<line id="bougie-cline-${i}" x1="${x1+1}" y1="${y1+1}" x2="${x2+1}" y2="${y2+1}" stroke="#C8A040" stroke-width="2" opacity="0"/>`;
+  });
+  /* Étoiles de la constellation (cachées jusqu'à la victoire) */
+  BOUGIE_CSTARS.forEach(([x, y], i) => {
+    str += `<rect id="bougie-cstar-${i}" x="${x-2}" y="${y-2}" width="5" height="5" fill="#FFE060" opacity="0"/>`;
   });
 
   str += '</svg>';
@@ -3147,15 +3204,15 @@ function _showBougieSuccess() {
   if (inputArea) inputArea.classList.add('hidden');
   if (coolEl)    coolEl.classList.add('hidden');
 
-  /* Révéler la constellation en doré */
-  for (let i = 0; i < 5; i++) {
+  /* Révéler la constellation en doré (cloche) */
+  BOUGIE_CSTARS.forEach((_, i) => {
     const s = document.getElementById('bougie-cstar-' + i);
     if (s) s.setAttribute('opacity', '1');
-  }
-  for (let i = 0; i < 4; i++) {
+  });
+  BOUGIE_CLINES.forEach((_, i) => {
     const l = document.getElementById('bougie-cline-' + i);
     if (l) l.setAttribute('opacity', '0.9');
-  }
+  });
 
   if (msgEl) {
     msgEl.textContent = cfg.texts.success;

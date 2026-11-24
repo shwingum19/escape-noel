@@ -53,6 +53,7 @@ html { overscroll-behavior: none; }
 
 html, body {
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background: linear-gradient(to bottom, var(--bg-top) 0%, var(--bg-mid) 65%, var(--bg-bot) 100%);
   color: var(--text-cream);
@@ -112,14 +113,19 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 20px 20px max(20px, env(safe-area-inset-bottom, 20px));
+  justify-content: safe center;
+  padding: 20px 16px max(24px, env(safe-area-inset-bottom, 24px));
+  padding-top: max(16px, env(safe-area-inset-top, 16px));
   z-index: 10;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s ease;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  /* scroll-padding évite que le clavier cache les champs focus */
+  scroll-padding-bottom: 80px;
 }
 .screen.active {
   opacity: 1;
@@ -130,9 +136,10 @@ html, body {
    SCREEN 1 — ACCUEIL
 ============================================================ */
 #screen-welcome {
-  gap: 16px;
+  gap: clamp(10px, 2.5vh, 16px);
   text-align: center;
-  padding-top: max(60px, env(safe-area-inset-top, 60px));
+  padding-top: max(52px, env(safe-area-inset-top, 52px));
+  padding-bottom: max(28px, env(safe-area-inset-bottom, 28px));
 }
 
 .welcome-top {
@@ -176,7 +183,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 22px 28px 18px;
+  padding: clamp(14px, 4vw, 22px) clamp(16px, 5vw, 28px) 18px;
   background: var(--wood-bg);
   border: 4px solid var(--wood-dark);
   /* Coins coupés en escalier style pixel art */
@@ -189,7 +196,7 @@ html, body {
   /* drop-shadow suit la forme du clip-path */
   filter: drop-shadow(4px 4px 0 var(--shadow));
   width: 100%;
-  max-width: 300px;
+  max-width: min(300px, calc(100vw - 40px));
 }
 
 .badge-icon  { font-size: 50px; }
@@ -200,7 +207,7 @@ html, body {
   text-shadow: 1px 1px 0 var(--wood-dark);
 }
 .badge-team {
-  font-size: 13px;
+  font-size: clamp(13px, 3.5vw, 15px);
   color: var(--text-dim);
   font-style: italic;
 }
@@ -210,12 +217,13 @@ html, body {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 14px;
+  font-size: clamp(14px, 3.8vw, 16px);
   color: var(--parch);
   background: rgba(0,0,0,0.3);
   border: 3px solid var(--wood-dark);
   box-shadow: 3px 3px 0 var(--shadow);
   padding: 8px 16px;
+  max-width: 100%;
 }
 
 .status-dot {
@@ -776,7 +784,7 @@ html, body {
 #screen-menu {
   justify-content: flex-start;
   align-items: stretch;
-  padding: 60px 0 max(24px, env(safe-area-inset-bottom, 24px));
+  padding: max(52px, env(safe-area-inset-top, 52px)) 0 max(24px, env(safe-area-inset-bottom, 24px));
 }
 
 .menu-wrap {
@@ -910,7 +918,7 @@ html, body {
 #screen-plan {
   justify-content: flex-start;
   align-items: stretch;
-  padding: 60px 0 0;
+  padding: max(52px, env(safe-area-inset-top, 52px)) 0 0;
   gap: 0;
   overflow: hidden;
 }
@@ -1202,7 +1210,7 @@ html, body {
 #screen-radio {
   justify-content: flex-start;
   align-items: stretch;
-  padding: 60px 0 0;
+  padding: max(52px, env(safe-area-inset-top, 52px)) 0 0;
   gap: 0;
   overflow: hidden;
 }
@@ -1421,7 +1429,7 @@ html, body {
 #screen-carnet {
   justify-content: flex-start;
   align-items: stretch;
-  padding: 60px 0 0;
+  padding: max(52px, env(safe-area-inset-top, 52px)) 0 0;
   gap: 0;
   overflow: hidden;
 }
@@ -1542,7 +1550,7 @@ html, body {
 #screen-puzzle {
   justify-content: flex-start;
   align-items:     stretch;
-  padding:         60px 0 0;
+  padding:         max(52px, env(safe-area-inset-top, 52px)) 0 0;
   gap:             0;
   overflow:        hidden;
 }
@@ -1824,7 +1832,7 @@ html, body {
 #screen-carillon {
   justify-content: flex-start;
   align-items: stretch;
-  padding: 60px 0 0;
+  padding: max(52px, env(safe-area-inset-top, 52px)) 0 0;
   gap: 0;
   overflow: hidden;
 }
@@ -2023,7 +2031,7 @@ html, body {
   justify-content: flex-start;
   align-items: stretch;
   overflow-y: auto;
-  padding: 0;
+  padding: max(52px, env(safe-area-inset-top, 52px)) 0 max(32px, env(safe-area-inset-bottom, 32px));
 }
 
 /* ── Préparation ── */
@@ -2199,12 +2207,13 @@ html, body {
 .bougie-input-area.hidden { display: none; }
 .bougie-input {
   font-family: 'VT323', monospace;
-  font-size: 22px;
+  font-size: 22px;         /* ≥16px pour éviter le zoom iOS */
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.25);
   color: #e8dcc0;
-  padding: 6px 12px;
-  width: 180px;
+  padding: 8px 12px;
+  width: clamp(130px, 44vw, 180px);
+  min-height: 48px;
   text-align: center;
   letter-spacing: 0.05em;
 }
@@ -2216,9 +2225,11 @@ html, body {
   background: rgba(200,160,40,0.18);
   border: 1px solid rgba(200,160,40,0.5);
   color: #E8C040;
-  padding: 6px 18px;
+  padding: 8px 18px;
+  min-height: 48px;
   cursor: pointer;
   letter-spacing: 0.05em;
+  touch-action: manipulation;
 }
 .bougie-btn-valider:hover { background: rgba(200,160,40,0.3); }
 .bougie-btn-valider:disabled { opacity: 0.4; cursor: default; }
@@ -2259,7 +2270,11 @@ html, body {
   background: #0C1A10;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: max(52px, env(safe-area-inset-top, 52px));
+  padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .foret-content {
@@ -2322,9 +2337,11 @@ html, body {
   background: #2A6020;
   color: #E8D090;
   border: 2px solid #4A9040;
-  padding: 6px 18px;
+  padding: 8px 18px;
+  min-height: 48px;
   cursor: pointer;
   letter-spacing: 1px;
+  touch-action: manipulation;
 }
 .foret-submit-btn:hover:not(:disabled) { background: #3A8030; }
 .foret-submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -2384,7 +2401,11 @@ html, body {
   background: #1A0E06;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: max(52px, env(safe-area-inset-top, 52px));
+  padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .trad-content {
@@ -2653,7 +2674,7 @@ html, body {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   pointer-events: none;
   z-index: 999;
   overflow: hidden;
